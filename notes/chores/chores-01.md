@@ -97,5 +97,10 @@ open; tracked as the "Buffer-swap servicing model" Todo.
   founding-conversation capture: this section, README goals,
   ARCHITECTURE + size table, TODO ladder;
   version.toml → 0.1.0-0.
+- [[N]] 0.1.0-1 chore: scaffold h2 histogram crate —
+  CargoRust.toml renamed to Cargo.toml (name
+  `histogram-no-std`, `std` feature, version-of-record moves
+  here at 0.1.0-1); version.toml retired; src/lib.rs
+  skeleton with module doc + `no_std` gate.
 
 # References

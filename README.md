@@ -5,9 +5,10 @@ for continuous monitoring of latency, jitter, and real-time
 lateness — built to be the core recording structure of
 [tprobe](../tprobe), but standalone and generally usable.
 
-Status: pre-scaffold — the 0.1.0 cycle is in progress (see
-[TODO.md](TODO.md)). Build / test / bench / run sections will
-be added here as the ladder steps that make them true land.
+Status: scaffolded, pre-code — the 0.1.0 cycle is in progress
+(see [TODO.md](TODO.md)). Build / test / bench / run sections
+will be added here as the ladder steps that make them true
+land.
 
 ## Goals
 

@@ -43,7 +43,7 @@ non-ff merge into `main` (manual jj steps for now — see the
      - capture the founding conversation: chores-01 section,
        README goals, ARCHITECTURE + size table, this ladder
      - version.toml → 0.1.0-0
-   - [[N]] 0.1.0-1 chore: scaffold h2 histogram crate
+   - [[N]] 0.1.0-1 chore: scaffold h2 histogram crate (done)
      - Cargo.toml from CargoRust.toml seed; version-of-record
        moves to Cargo.toml, version.toml retires
      - lib.rs skeleton, `std` feature

@@ -1,0 +1,24 @@
+# no_std-first HdrHistogram-style log-linear histogram; the
+# core recording structure for ../tprobe. Design and size
+# tradeoffs in ARCHITECTURE.md; version-of-record lives here
+# (see notes/versioning.md).
+[package]
+name = "histogram-no-std"
+version = "0.1.0-1"
+edition = "2024"
+rust-version = "1.97"
+license = "MIT OR Apache-2.0"
+description = "no_std no-alloc HdrHistogram-style log-linear histogram"
+publish = false
+
+[features]
+default = ["std"]
+std = []
+
+# Panicking sites are opt-in: each needs a site `#[allow]` +
+# `// OK: …` justification (see AGENTS.md > Code Conventions).
+[lints.clippy]
+unwrap_used = "warn"
+expect_used = "warn"
+
+[dependencies]
