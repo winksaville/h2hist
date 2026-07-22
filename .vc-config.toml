@@ -1,0 +1,44 @@
+# vc-config: Vibe Coding workspace configuration
+#
+# workspace-path is this repo's path relative to the workspace root.
+# Used to resolve changeID paths in git trailers (e.g. ochid: /changeID).
+# other-repo is the relative path to the counterpart repo.
+
+[workspace]
+path = "/"
+other-repo = ".claude"
+
+# Optional keys — uncomment and edit to override the built-in
+# default. `vc-x1 config` prints this list from the binary.
+
+[bot-session]
+# bot-session.items — Default bot-session item set (comma-separated)
+#   used by: bot-session --<item> / --no-<item> / --all / --none
+#   default: "headers,user,assistant,tool,summary"
+# items = "headers,user,assistant,tool,summary"
+
+# bot-session.result-lines — Default --result-lines: max lines shown
+#   per tool result (0 = unlimited)
+#   used by: bot-session --result-lines
+#   default: 10
+# result-lines = 10
+
+# bot-session.col-width — Default --col-width: first-column width in
+#   the field-inventory views
+#   used by: bot-session --col-width
+#   default: 68
+# col-width = 68
+
+[push]
+# push.state-dir — Directory (relative to repo root) holding the push
+#   state file
+#   used by: push / squash-push (state-file directory)
+#   default: ".vc-x1"
+# state-dir = ".vc-x1"
+
+# push.state-file — Filename of the push state file under
+#   push.state-dir
+#   used by: push / squash-push (state-file name)
+#   default: "push-state.toml"
+# state-file = "push-state.toml"
+
