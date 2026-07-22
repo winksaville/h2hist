@@ -48,7 +48,7 @@ non-ff merge into `main` (manual jj steps for now — see the
        moves to Cargo.toml, version.toml retires
      - lib.rs skeleton, `std` feature
        (`#![cfg_attr(not(feature = "std"), no_std)]`)
-   - [[N]] 0.1.0-2 feat: h2 histogram config and index math
+   - [[N]] 0.1.0-2 feat: h2 histogram config and index math (done)
      - `Config { grouping_power, max_value_power }` +
        validation
      - `total_buckets` / `index_for` / `value_range` as

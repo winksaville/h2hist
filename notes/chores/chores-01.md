@@ -102,5 +102,11 @@ open; tracked as the "Buffer-swap servicing model" Todo.
   `histogram-no-std`, `std` feature, version-of-record moves
   here at 0.1.0-1); version.toml retired; src/lib.rs
   skeleton with module doc + `no_std` gate.
+- [[N]] 0.1.0-2 feat: h2 histogram config and index math —
+  `Config` (validated powers, `const fn` bucket count /
+  value→index / index→range), `Error`; exhaustive
+  small-config walk proves indices monotone and ranges an
+  exact partition; over-range clamps to top bucket, n=64
+  edge covered.
 
 # References

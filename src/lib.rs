@@ -10,3 +10,7 @@
 //!   tradeoffs.
 
 #![cfg_attr(not(feature = "std"), no_std)]
+
+mod config;
+
+pub use config::{Config, Error};
