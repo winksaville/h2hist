@@ -18,6 +18,9 @@ pub enum Error {
     /// `(n - g + 1) << g` exceeds `u32::MAX` buckets — far
     /// beyond any practical footprint.
     TooManyBuckets,
+    /// Counts storage length differs from
+    /// `Config::total_buckets()`.
+    StorageLen,
 }
 
 /// The two h2 powers plus the index math they induce.

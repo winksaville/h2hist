@@ -12,5 +12,9 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 mod config;
+mod counter;
+mod histogram;
 
 pub use config::{Config, Error};
+pub use counter::Counter;
+pub use histogram::Histogram;

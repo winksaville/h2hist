@@ -55,7 +55,7 @@ non-ff merge into `main` (manual jj steps for now — see the
        `const fn`
      - exhaustive small-config tests (walk every value,
        assert monotone indices, ranges partition domain)
-   - [[N]] 0.1.0-3 feat: h2 histogram record path
+   - [[N]] 0.1.0-3 feat: h2 histogram record path (done)
      - `Counter` trait (u8/u16/u32/u64, default u32,
        saturating add)
      - borrowed-storage `Histogram`, `record` / `record_n`,

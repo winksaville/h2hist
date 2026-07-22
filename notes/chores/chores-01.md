@@ -108,5 +108,14 @@ open; tracked as the "Buffer-swap servicing model" Todo.
   small-config walk proves indices monotone and ranges an
   exact partition; over-range clamps to top bucket, n=64
   edge covered.
+- [[N]] 0.1.0-3 feat: h2 histogram record path — `Counter`
+  trait (u8..u64, saturating, u32 default) and the
+  borrowed-storage `Histogram`:
+  - `new` checks storage length and *recomputes* `total`
+    from the counts, so a slice handed back by a future
+    swap servicer rebinds consistently;
+  - `record`/`record_n` never panic (`get_mut` guarded by
+    the tested index invariant); `into_counts` releases the
+    borrow — the swap hand-off shape.
 
 # References
