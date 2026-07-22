@@ -60,7 +60,7 @@ non-ff merge into `main` (manual jj steps for now — see the
        saturating add)
      - borrowed-storage `Histogram`, `record` / `record_n`,
        top-bucket clamp for over-range values
-   - [[N]] 0.1.0-4 feat: h2 histogram owned-array wrapper
+   - [[N]] 0.1.0-4 feat: h2 histogram owned-array wrapper (done)
      - const-generic `HistogramArray<N, C>` with size check
        against `Config::total_buckets()`
    - [[N]] 0.1.0-5 feat: h2 histogram quantile merge and iter

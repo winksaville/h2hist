@@ -117,5 +117,13 @@ open; tracked as the "Buffer-swap servicing model" Todo.
   - `record`/`record_n` never panic (`get_mut` guarded by
     the tested index invariant); `into_counts` releases the
     borrow — the swap hand-off shape.
+- [[N]] 0.1.0-4 feat: h2 histogram owned-array wrapper —
+  `HistogramArray<N, C>` owns `[C; N]`; N is explicit
+  (stable Rust can't derive it from Config powers) and
+  checked in `new`; record path shared with the borrowed
+  type via `record_into`; `as_histogram()` gives one
+  analysis surface for both storage shapes (carries the
+  crate's first non-test `unwrap`, `// OK:` justified —
+  constructor-checked invariant).
 
 # References

@@ -11,6 +11,25 @@
 use crate::config::{Config, Error};
 use crate::counter::Counter;
 
+/// Shared record-path core for the borrowed and owned types:
+/// index `value`, saturating-add `n` into its bucket, bump
+/// `total`. The `get_mut` guard makes the panic path
+/// unreachable (index invariant proven by the config tests).
+#[inline]
+pub(crate) fn record_into<C: Counter>(
+    config: &Config,
+    counts: &mut [C],
+    total: &mut u64,
+    value: u64,
+    n: u64,
+) {
+    let idx = config.index_for(value);
+    if let Some(c) = counts.get_mut(idx) {
+        *c = c.sat_add(n);
+        *total = total.saturating_add(n);
+    }
+}
+
 /// A log-linear histogram over caller-supplied counts storage.
 ///
 /// - `config` — the h2 powers and index math.
@@ -70,13 +89,7 @@ impl<'a, C: Counter> Histogram<'a, C> {
     /// [`record`](Histogram::record).
     #[inline]
     pub fn record_n(&mut self, value: u64, n: u64) {
-        let idx = self.config.index_for(value);
-        // Invariant: index_for < total_buckets == counts.len(),
-        // proven by the exhaustive config tests.
-        if let Some(c) = self.counts.get_mut(idx) {
-            *c = c.sat_add(n);
-            self.total = self.total.saturating_add(n);
-        }
+        record_into(&self.config, self.counts, &mut self.total, value, n);
     }
 
     /// Count in bucket `index`, widened to u64; `None` past
