@@ -133,5 +133,13 @@ open; tracked as the "Buffer-swap servicing model" Todo.
   for oracle parity; integer ceil, no std float intrinsics),
   `merge_from` (saturating, `ConfigMismatch` on unequal
   configs). Decision recorded: f64 quantile input kept.
+- [[N]] 0.1.0-6 test: h2 histogram oracle parity suite —
+  tests/oracle.rs with seeded splitmix64 streams (no rand
+  dep). vs iopsystems `histogram`: **identical counts
+  arrays** on uniform streams over four configs plus
+  power-of-two boundary walk — index math is bit-identical.
+  vs `hdrhistogram` (2 sigfig): quantiles p0..p100 on a
+  200k heavy-tailed stream within combined tolerance
+  (2⁻ᵍ + 1%); totals equal.
 
 # References

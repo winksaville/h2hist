@@ -66,7 +66,7 @@ non-ff merge into `main` (manual jj steps for now — see the
    - [[N]] 0.1.0-5 feat: h2 histogram quantile merge and iter (done)
      - `quantile`, `merge_from`, bucket iterator (range,
        count); decide f64-vs-integer quantile input here
-   - [[N]] 0.1.0-6 test: h2 histogram oracle parity suite
+   - [[N]] 0.1.0-6 test: h2 histogram oracle parity suite (done)
      - dev-dep iopsystems `histogram`: exact index parity
      - dev-dep `hdrhistogram` 7: quantile parity within
        equivalent-value tolerance, randomized streams

@@ -4,7 +4,7 @@
 # (see notes/versioning.md).
 [package]
 name = "histogram-no-std"
-version = "0.1.0-5"
+version = "0.1.0-6"
 edition = "2024"
 rust-version = "1.97"
 license = "MIT OR Apache-2.0"
@@ -22,3 +22,11 @@ unwrap_used = "warn"
 expect_used = "warn"
 
 [dependencies]
+
+# Correctness oracles (tests only): iopsystems `histogram`
+# shares the h2 scheme (exact counts parity); `hdrhistogram`
+# is the reference implementation (quantile parity within
+# equivalent-value tolerance).
+[dev-dependencies]
+hdrhistogram = { version = "7", default-features = false }
+histogram = "1"
