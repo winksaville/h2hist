@@ -70,7 +70,7 @@ non-ff merge into `main` (manual jj steps for now — see the
      - dev-dep iopsystems `histogram`: exact index parity
      - dev-dep `hdrhistogram` 7: quantile parity within
        equivalent-value tolerance, randomized streams
-   - [[N]] 0.1.0-7 feat: h2 histogram demo example
+   - [[N]] 0.1.0-7 feat: h2 histogram demo example (done)
      - `examples/h2demo.rs`: record synthetic latency stream,
        print an iiac-perf-style band table (z/p/n bands with
        first/last/range/count/mean, trimmed mean/stdev)

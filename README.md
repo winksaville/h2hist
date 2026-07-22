@@ -5,10 +5,29 @@ for continuous monitoring of latency, jitter, and real-time
 lateness — built to be the core recording structure of
 [tprobe](../tprobe), but standalone and generally usable.
 
-Status: scaffolded, pre-code — the 0.1.0 cycle is in progress
-(see [TODO.md](TODO.md)). Build / test / bench / run sections
-will be added here as the ladder steps that make them true
-land.
+Status: 0.1.0 cycle in progress (see [TODO.md](TODO.md));
+core, analysis, oracle tests, and demo have landed. The bench
+section arrives with the ladder step that makes it true.
+
+## Build and test
+
+- `cargo build` — host build (std feature on by default).
+- `cargo build --no-default-features` — the `no_std`
+  configuration.
+- `cargo test` — unit tests, doctests, and the oracle parity
+  suite (dev-deps on `hdrhistogram` and iopsystems
+  `histogram` as correctness oracles).
+
+## Demo
+
+`examples/h2demo.rs` records 1M synthetic latency ticks and
+prints an iiac-perf-style band table (z/p/n quantile bands
+with first/last/range/count/mean, overall and tail-trimmed
+mean/stdev):
+
+- `cargo run --example h2demo` — run in place.
+- `cargo install --path . --example h2demo` — install the
+  demo as a `h2demo` binary.
 
 ## Goals
 

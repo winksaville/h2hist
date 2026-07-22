@@ -141,5 +141,13 @@ open; tracked as the "Buffer-swap servicing model" Todo.
   vs `hdrhistogram` (2 sigfig): quantiles p0..p100 on a
   200k heavy-tailed stream within combined tolerance
   (2⁻ᵍ + 1%); totals equal.
+- [[N]] 0.1.0-7 feat: h2 histogram demo example —
+  examples/h2demo.rs (drafted by a Sonnet subagent to a
+  fixed spec, reviewed): 1M-sample synthetic stream, band
+  table built in ONE `buckets()` pass off the cumulative
+  field (fences never call `quantile()`); band `last`s
+  cross-check `quantile()` exactly. Installable via
+  `cargo install --path . --example h2demo`. README gains
+  Build-and-test + Demo sections.
 
 # References
