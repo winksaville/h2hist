@@ -11,11 +11,13 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
+mod analysis;
 mod array;
 mod config;
 mod counter;
 mod histogram;
 
+pub use analysis::{Bucket, Buckets};
 pub use array::HistogramArray;
 pub use config::{Config, Error};
 pub use counter::Counter;

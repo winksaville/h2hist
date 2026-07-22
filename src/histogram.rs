@@ -8,6 +8,7 @@
 //!   clz, two shifts) and a saturating increment. No floats,
 //!   no allocation, no panics.
 
+use crate::analysis::{Buckets, merge_into, quantile_of};
 use crate::config::{Config, Error};
 use crate::counter::Counter;
 
@@ -102,6 +103,29 @@ impl<'a, C: Counter> Histogram<'a, C> {
     /// the swap-model hand-off shape.
     pub fn into_counts(self) -> &'a mut [C] {
         self.counts
+    }
+
+    /// Iterate every bucket lowest-first, with cumulative
+    /// counts (the band-table building block).
+    pub fn buckets(&self) -> Buckets<'_, C> {
+        Buckets::new(self.config, self.counts)
+    }
+
+    /// Value at quantile `q` in `[0.0, 1.0]`: the upper
+    /// bound of the bucket holding the rank-`ceil(q·total)`
+    /// value (hdrhistogram's highest-equivalent convention,
+    /// one-sided error ≤ 2⁻ᵍ). `None` when empty or `q` is
+    /// out of range (NaN included).
+    pub fn quantile(&self, q: f64) -> Option<u64> {
+        quantile_of(&self.config, self.counts, self.total, q)
+    }
+
+    /// Merge `other`'s counts into `self` (saturating);
+    /// configs must be identical.
+    pub fn merge_from(&mut self, other: &Histogram<'_, C>) -> Result<(), Error> {
+        let added = merge_into(&self.config, self.counts, &other.config, other.counts)?;
+        self.total = self.total.saturating_add(added);
+        Ok(())
     }
 }
 

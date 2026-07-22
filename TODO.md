@@ -63,7 +63,7 @@ non-ff merge into `main` (manual jj steps for now — see the
    - [[N]] 0.1.0-4 feat: h2 histogram owned-array wrapper (done)
      - const-generic `HistogramArray<N, C>` with size check
        against `Config::total_buckets()`
-   - [[N]] 0.1.0-5 feat: h2 histogram quantile merge and iter
+   - [[N]] 0.1.0-5 feat: h2 histogram quantile merge and iter (done)
      - `quantile`, `merge_from`, bucket iterator (range,
        count); decide f64-vs-integer quantile input here
    - [[N]] 0.1.0-6 test: h2 histogram oracle parity suite

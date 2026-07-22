@@ -8,6 +8,7 @@
 //!   and checked at construction against
 //!   `Config::total_buckets()`.
 
+use crate::analysis::{Buckets, merge_into, quantile_of};
 use crate::config::{Config, Error};
 use crate::counter::Counter;
 use crate::histogram::{Histogram, record_into};
@@ -77,6 +78,26 @@ impl<const N: usize, C: Counter> HistogramArray<N, C> {
     /// the last bucket.
     pub fn count_at(&self, index: usize) -> Option<u64> {
         self.counts.get(index).map(|c| c.to_u64())
+    }
+
+    /// Iterate every bucket lowest-first, with cumulative
+    /// counts (the band-table building block).
+    pub fn buckets(&self) -> Buckets<'_, C> {
+        Buckets::new(self.config, &self.counts)
+    }
+
+    /// Value at quantile `q`; semantics of
+    /// [`Histogram::quantile`].
+    pub fn quantile(&self, q: f64) -> Option<u64> {
+        quantile_of(&self.config, &self.counts, self.total, q)
+    }
+
+    /// Merge `other`'s counts into `self` (saturating);
+    /// configs must be identical.
+    pub fn merge_from(&mut self, other: &HistogramArray<N, C>) -> Result<(), Error> {
+        let added = merge_into(&self.config, &mut self.counts, &other.config, &other.counts)?;
+        self.total = self.total.saturating_add(added);
+        Ok(())
     }
 
     /// Borrow as the slice-backed [`Histogram`] view — one

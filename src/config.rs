@@ -21,6 +21,8 @@ pub enum Error {
     /// Counts storage length differs from
     /// `Config::total_buckets()`.
     StorageLen,
+    /// Operation requires identical configs (e.g. merge).
+    ConfigMismatch,
 }
 
 /// The two h2 powers plus the index math they induce.

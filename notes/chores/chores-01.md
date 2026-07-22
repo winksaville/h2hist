@@ -125,5 +125,13 @@ open; tracked as the "Buffer-swap servicing model" Todo.
   analysis surface for both storage shapes (carries the
   crate's first non-test `unwrap`, `// OK:` justified —
   constructor-checked invariant).
+- [[N]] 0.1.0-5 feat: h2 histogram quantile merge and iter —
+  `analysis` module shared by both storage shapes: `Bucket` /
+  `Buckets` iterator carrying **cumulative** counts (the
+  band-table requirement), `quantile` (upper-bound
+  convention — hdrhistogram's highest-equivalent — chosen
+  for oracle parity; integer ceil, no std float intrinsics),
+  `merge_from` (saturating, `ConfigMismatch` on unequal
+  configs). Decision recorded: f64 quantile input kept.
 
 # References
