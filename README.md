@@ -6,8 +6,8 @@ lateness — built to be the core recording structure of
 [tprobe](../tprobe), but standalone and generally usable.
 
 Status: 0.1.0 cycle in progress (see [TODO.md](TODO.md));
-core, analysis, oracle tests, and demo have landed. The bench
-section arrives with the ladder step that makes it true.
+core, analysis, oracle tests, demo, no_std check, and bench
+have landed.
 
 ## Build and test
 
@@ -28,6 +28,16 @@ mean/stdev):
 - `cargo run --example h2demo` — run in place.
 - `cargo install --path . --example h2demo` — install the
   demo as a `h2demo` binary.
+
+## no_std check and bench
+
+- `./scripts/check-no-std.sh` — builds the core
+  (`--no-default-features`) for every installed bare-metal
+  (`*-none-*`) target.
+- `cargo bench` — record-path cost vs a raw store and
+  `hdrhistogram` (hand-rolled harness; indicative numbers
+  and the resulting design decision are in
+  [chores-01](notes/chores/chores-01.md)).
 
 ## Goals
 

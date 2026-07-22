@@ -4,7 +4,7 @@
 # (see notes/versioning.md).
 [package]
 name = "histogram-no-std"
-version = "0.1.0-7"
+version = "0.1.0-8"
 edition = "2024"
 rust-version = "1.97"
 license = "MIT OR Apache-2.0"
@@ -30,3 +30,9 @@ expect_used = "warn"
 [dev-dependencies]
 hdrhistogram = { version = "7", default-features = false }
 histogram = "1"
+
+# Hand-rolled bench (no criterion): a custom main keeps the
+# dev-dep graph small and the loop under our control.
+[[bench]]
+name = "record"
+harness = false

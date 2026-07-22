@@ -193,8 +193,10 @@ bucket iterator:
 - `no_std` proof: a check script building
   `--no-default-features` for a bare-metal target.
 - Record-path bench: ns/record vs a raw array store and vs
-  `hdrhistogram`; also decides whether exact min/max
-  tracking stays on the hot path.
+  `hdrhistogram`. Outcome (0.1.0-8): 2.6 ns/record vs
+  hdrhistogram's 4.9; exact min/max/sum would add ~28%, so
+  they stay **off** the hot path (bench numbers and decision
+  in chores-01).
 
 ## Deferred directions
 

@@ -91,6 +91,28 @@ the config/storage split is the only accommodation. Watermark
 semantics, signal transport, and hand-off protocol are all
 open; tracked as the "Buffer-swap servicing model" Todo.
 
+### Record-cost bench and the hot-path-extras decision
+
+`benches/record.rs` (hand-rolled, harness=false; g=7 n=30,
+8M-value heavy-tailed stream, best of 3, 3900X, unpinned —
+indicative, not a lab record):
+
+- raw streaming store 0.87 ns/record
+- histogram u32 2.57 ns/record
+- histogram u32 + min/max/sum extras 3.29 ns/record
+- hdrhistogram (2 sigfig) 4.95 ns/record
+
+**Decision: extras stay off the hot path.** Exact min/max and
+running sum would cost ~+28% per record; band tables already
+get bucket-resolution first/last and midpoint means from the
+iterator (h2demo proves the readout), so the default record
+path keeps only the bucket increment + total. Revisit only if
+a consumer needs exact mean/min/max — that would be an opt-in
+wrapper, not a change to `record`. We think the histogram-vs-
+raw-store gap (2.6 vs 0.9 ns) overstates the field cost: the
+raw store here is cache-warm and the histogram price buys a
+fixed footprint, per tprobe's round-3 verdict.
+
 ### As-built ladder
 
 - [[N]] 0.1.0-0 chore: h2 histogram plan capture — the
@@ -149,5 +171,12 @@ open; tracked as the "Buffer-swap servicing model" Todo.
   cross-check `quantile()` exactly. Installable via
   `cargo install --path . --example h2demo`. README gains
   Build-and-test + Demo sections.
+- [[N]] 0.1.0-8 chore: h2 histogram no_std check and bench —
+  scripts/check-no-std.sh builds the core for every
+  installed `*-none-*` target (passes on riscv32imac + four
+  thumb targets); benches/record.rs (hand-rolled,
+  harness=false) measures the record path; numbers and the
+  extras-off decision in the design subsection above.
+  README gains the no_std-check + bench section.
 
 # References

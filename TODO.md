@@ -75,7 +75,7 @@ non-ff merge into `main` (manual jj steps for now — see the
        print an iiac-perf-style band table (z/p/n bands with
        first/last/range/count/mean, trimmed mean/stdev)
      - installable: `cargo install --path . --example h2demo`
-   - [[N]] 0.1.0-8 chore: h2 histogram no_std check and bench
+   - [[N]] 0.1.0-8 chore: h2 histogram no_std check and bench (done)
      - script building `--no-default-features` for a bare
        target (e.g. `thumbv7em-none-eabihf`)
      - record-path bench vs raw array store and
