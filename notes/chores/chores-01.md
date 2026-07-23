@@ -494,7 +494,7 @@ instead; the walk is off the hot path.
   - Tests: table equals manual assignment + Stats windows,
     trim extent naming, MidRank total conservation, capacity
     rejection, zeroed empty table.
-- [[N]] 0.1.3-6 feat: band table rendering — `src/report.rs`,
+- [[19]] 0.1.3-6 feat: std band table rendering — `src/report.rs`,
   the render side of the device/service split, **`std`-only**:
   - A `no_std`-capable renderer was fully drafted first
     (counting-writer width passes, double-write cells,
@@ -534,6 +534,34 @@ instead; the walk is off the hot path.
   - `Both` in two-cell form prints zpn and fraction as
     separate columns (the demo's `{:<4} {:<13}` shape);
     min/max rows leave the fraction cell empty.
+- [[N]] 0.1.3-7 refactor: h2demo on library report path — the
+  cycle's integration proof: the demo drops from 288 to 78
+  lines and every table number comes from the library modules.
+  - Gate result: 23 of 24 output lines byte-identical, all
+    summary rows included. The one divergence was ruled
+    correct and accepted: at 1M samples the old demo's
+    n6/n7/n8 fences collapse to one rank and its
+    "extend the last spanning fence" patch silently slid the
+    top sample into n6, inflating that row's last/range/mean;
+    the ladder's honest max fence gives n6 its true 9 ranks
+    and the top sample its own `max` row. Reproducing the
+    quirk would have needed band-merging machinery to
+    preserve a misstatement.
+  - What remains in the demo: recording, the header lines,
+    and the p50/p99 spot reads — the intended consumer shape
+    (build table, render, print).
+  - `BandAssign` gains `name()` and the demo's title line
+    names the convention in use. Reviewing the two
+    conventions' outputs side by side showed the tables are
+    otherwise indistinguishable in shape, and the names
+    (`RankSplit`, `MidRank`) are this crate's coinages —
+    mid-rank/Hazen has standard-statistics grounding,
+    RankSplit does not — so a report must say which
+    convention produced it.
+  - Tooling note: this workspace now runs on `vc-x1-dev`
+    (0.75.x, the in-refactor branch) — the `.vc-config.toml`
+    schema migrated at `-6` is ahead of stable 0.71, so dev
+    is the binary that accepts this repo.
 
 # References
 
@@ -555,3 +583,4 @@ instead; the walk is off the hot path.
 [16]: https://github.com/winksaville/h2hist/commit/469c841ae7c5 "469c841ae7c5a2708bc092a2e91865e3f76b4fcd"
 [17]: https://github.com/winksaville/h2hist/commit/123a32ccdd26 "123a32ccdd265d2954ab0f28baebaec9b2ff81c2"
 [18]: https://github.com/winksaville/h2hist/commit/20c59cdd5db8 "20c59cdd5db8f35f36e782deb0340346a37f4b5f"
+[19]: https://github.com/winksaville/h2hist/commit/5a08fb046101 "5a08fb04610119474d7f9a47ee9e3739f4b8e03c"

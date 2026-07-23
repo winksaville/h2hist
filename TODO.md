@@ -72,7 +72,7 @@ decision — see [[5]].
   - `src/table.rs`: fixed-capacity `BandTable` — bands + overall
     + trimmed stats + trim range, assembled from a re-creatable
     bucket stream; `CAP` from a `const Ladder::band_count()`
-- [[N]] 0.1.3-6 feat: band table rendering (done)
+- [[12]] 0.1.3-6 feat: std band table rendering (done)
   - `src/report.rs`, `std`-only: `render_band_table` returns a
     `String`, measured (`Layout::measure`) or fixed
     (`Layout::DEMO_LEGACY`) column widths
@@ -84,9 +84,16 @@ decision — see [[5]].
     candidate
   - a drafted `no_std` renderer was rejected as machinery
     serving nobody (devices ship structs, services render)
-- [[N]] 0.1.3-7 refactor: h2demo on library report path
-  - demo ~288 → ~60 lines, gated on output identical to today's
-    at matching ladder depths
+- [[N]] 0.1.3-7 refactor: h2demo on library report path (done)
+  - demo 288 → 78 lines: record, spot quantiles, and header
+    lines stay; the table is `BandTable` + `render_band_table`
+    at the historical z4/n8 depths and fixed layout
+  - gate result: byte-identical except the old tail-absorption
+    quirk, deliberately retired — the top sample now prints as
+    an honest `max` row instead of inflating n6
+  - `BandAssign` gains `name()` and the demo header names the
+    convention ("(RankSplit)") — the two shipped names are this
+    crate's coinages, so tables are self-describing
 - [[N]] 0.1.3-8 docs: band report modules
   - README, ARCHITECTURE, and the switch to the fuller z4..n10
     ladder as a visible change
@@ -166,3 +173,4 @@ and older `## Done` sections are moved to [done.md](notes/done.md) to keep this 
 [9]: https://github.com/winksaville/h2hist/commit/469c841ae7c5 "469c841ae7c5a2708bc092a2e91865e3f76b4fcd"
 [10]: https://github.com/winksaville/h2hist/commit/123a32ccdd26 "123a32ccdd265d2954ab0f28baebaec9b2ff81c2"
 [11]: https://github.com/winksaville/h2hist/commit/20c59cdd5db8 "20c59cdd5db8f35f36e782deb0340346a37f4b5f"
+[12]: https://github.com/winksaville/h2hist/commit/5a08fb046101 "5a08fb04610119474d7f9a47ee9e3739f4b8e03c"

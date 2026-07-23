@@ -243,6 +243,11 @@ impl Band {
 pub trait BandAssign {
     /// Fold `bucket` into `bands`.
     fn assign(&mut self, bucket: &Bucket, total: u64, ladder: &Ladder, bands: &mut [Band]);
+
+    /// The convention's display name, for report headers —
+    /// the two shipped names are this crate's coinages, so a
+    /// report should say which convention produced it.
+    fn name(&self) -> &'static str;
 }
 
 /// Exact rank-split assignment (the demo's convention).
@@ -297,6 +302,10 @@ impl BandAssign for RankSplit {
             seg_start = seg_end + 1;
         }
     }
+
+    fn name(&self) -> &'static str {
+        "RankSplit"
+    }
 }
 
 /// Whole-bucket mid-rank assignment (iiac-perf's convention).
@@ -349,6 +358,10 @@ impl BandAssign for MidRank {
         if let Some(band) = bands.get_mut(band_index) {
             band.fold(bucket.low, bucket.high, bucket.count);
         }
+    }
+
+    fn name(&self) -> &'static str {
+        "MidRank"
     }
 }
 
