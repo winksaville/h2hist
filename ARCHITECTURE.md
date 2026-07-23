@@ -76,13 +76,14 @@ are separate, and the core histogram type *borrows* its counts.
 
 - Core: `#![cfg_attr(not(feature = "std"), no_std)]`,
   no dependencies.
-- `std` (default): convenience only — the demo example, the
-  stdout side of reporting, and any std-needing helpers.
-- Band-table reporting **is** in this crate, as of 0.1.3, and
-  is `no_std`: the modules build report *structures*
-  (`bands`, `stats`, `table`) and render into any
-  `core::fmt::Write` (`report`); only writing to stdout needs
-  `std`. This reverses the founding decision to leave
+- `std` (default): the render module (`report`) and any
+  std-needing helpers.
+- Band-table reporting **is** in this crate as of 0.1.3,
+  split along the device/service line: the `no_std` modules
+  build report *structures* (`bands`, `stats`, `table`) — the
+  artifacts a device would ship over a wire — and the
+  `std`-gated `report` module renders them as text on the
+  service side. This reverses the founding decision to leave
   reporting to tprobe — see
   [Readout requirements](#readout-requirements-band-tables).
 - Dev-dependencies (tests/benches only): iopsystems

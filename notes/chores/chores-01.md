@@ -349,10 +349,10 @@ without adding a dependency:
   boundary is `total * num / den` in u128. Exact, and more
   accurate than the `(fraction * total as f64).floor()` the
   demo used.
-- Alloc-free rendering measures column widths with a counting
-  writer pass rather than buffering formatted rows, and label
-  text is written into the sink instead of returned as
-  `String`.
+- Rendering was originally planned `no_std`-capable too
+  (counting-writer width passes, sink-written labels); that
+  was rejected at `-6` once written — see the `-6` As-built
+  rung. The render module is `std`-gated instead.
 
 ### Numeric fix carried along
 
@@ -474,7 +474,7 @@ instead; the walk is off the hot path.
   - `from_buckets` / `from_window` take a `Fn() -> Iterator`
     so the two passes re-create the stream — `|| h.buckets()`
     for the histogram types, any mapped stream for adopters.
-- [[N]] 0.1.3-5 feat: band table structure — `src/table.rs`,
+- [[18]] 0.1.3-5 feat: band table structure — `src/table.rs`,
   the assembled ship-structs-to-a-service artifact:
   - `BandTable<CAP>`: bands + overall + trimmed `Stats` +
     the populated trim extent, all numbers; rendering waits
@@ -494,6 +494,46 @@ instead; the walk is off the hot path.
   - Tests: table equals manual assignment + Stats windows,
     trim extent naming, MidRank total conservation, capacity
     rejection, zeroed empty table.
+- [[N]] 0.1.3-6 feat: band table rendering — `src/report.rs`,
+  the render side of the device/service split, **`std`-only**:
+  - A `no_std`-capable renderer was fully drafted first
+    (counting-writer width passes, double-write cells,
+    hand-rolled scaled-u128 f64 formatting, a Newton `sqrt`
+    fallback) and rejected on review: devices ship structs
+    and services render, so the ~200 lines of machinery
+    served nobody. Gating the module on `std` states the
+    architecture at the crate boundary and the code drops to
+    plain `String` / `format!` — the shape iiac-perf's
+    `print_report` already has.
+  - Boundary labels land here as free functions (the `-2`
+    parked code, adapted): a label is presentation, so it
+    lives with the renderer, not on the data types. String
+    pins vs iiac-perf's documented label lists restored.
+  - `render_band_table` returns a `String`: header, one row
+    per populated band (first/last/range/count/mean), blank
+    line, overall and trimmed mean/stdev rows — the demo's
+    shape, proven by a snapshot test that renders a
+    fully-predictable table and compares byte-for-byte
+    against the demo's own format strings
+    (`Layout::DEMO_LEGACY`).
+  - `Layout` carries the column widths: `measure()` for snug
+    columns, `DEMO_LEGACY` for the demo's historical fixed
+    shape — both feed the same renderer, keeping the `-7`
+    byte-identical gate and the iiac-perf measured style on
+    one code path.
+  - `fmt_commas` / `fmt_commas_f64` are iiac-perf's shapes
+    (format! + regrouping), in their own `numfmt` module —
+    presentation plumbing, not histogram logic, and a
+    candidate for promotion to a separate crate later.
+    Noted: format!'s rounding follows
+    the true stored double (0.95 stores below the tie and
+    prints `0.9` at one decimal) where the demo's
+    `(x*10).round()/10` can differ through an intermediate;
+    we think no real mean lands on such a tie, and the `-7`
+    gate would catch one.
+  - `Both` in two-cell form prints zpn and fraction as
+    separate columns (the demo's `{:<4} {:<13}` shape);
+    min/max rows leave the fraction cell empty.
 
 # References
 
@@ -514,3 +554,4 @@ instead; the walk is off the hot path.
 [15]: https://github.com/winksaville/h2hist/commit/a6f7444a0bf7 "a6f7444a0bf72c547cd9c286c914477fd9680970"
 [16]: https://github.com/winksaville/h2hist/commit/469c841ae7c5 "469c841ae7c5a2708bc092a2e91865e3f76b4fcd"
 [17]: https://github.com/winksaville/h2hist/commit/123a32ccdd26 "123a32ccdd265d2954ab0f28baebaec9b2ff81c2"
+[18]: https://github.com/winksaville/h2hist/commit/20c59cdd5db8 "20c59cdd5db8f35f36e782deb0340346a37f4b5f"

@@ -34,8 +34,9 @@ the `(7, 30)` config are copied verbatim across `tests/oracle.rs`,
 `benches/record.rs`, and `examples/h2demo.rs`, so a change to one
 silently diverges from the others.
 
-Everything practical stays `no_std`: the new modules build report
-*structures*; only writing them to stdout is `std`-gated. This
+The split follows the device/service model: the `no_std` modules
+build report *structures* (what a device ships over a wire);
+rendering them as text is the `std`-gated `report` module. This
 reverses ARCHITECTURE.md's "band-table reporting stays in tprobe"
 decision — see [[5]].
 
@@ -67,16 +68,22 @@ decision — see [[5]].
     are all the same primitive
   - two-pass variance, avoiding the `sumsq/n - mean²`
     cancellation the demo has today; `stdev()` under `std`
-- [[N]] 0.1.3-5 feat: band table structure (done)
+- [[11]] 0.1.3-5 feat: band table structure (done)
   - `src/table.rs`: fixed-capacity `BandTable` — bands + overall
     + trimmed stats + trim range, assembled from a re-creatable
     bucket stream; `CAP` from a `const Ladder::band_count()`
-- [[N]] 0.1.3-6 feat: band table rendering
-  - `src/report.rs`: renders into any `core::fmt::Write` with
-    two-pass width measurement; `std` adds the stdout convenience
-  - boundary labels land here (`BandLabels`, the `write_*`
-    methods and tests parked at `-2` in
-    `tmp/bands-with-labels-parked-for-0.1.3-6.rs`)
+- [[N]] 0.1.3-6 feat: band table rendering (done)
+  - `src/report.rs`, `std`-only: `render_band_table` returns a
+    `String`, measured (`Layout::measure`) or fixed
+    (`Layout::DEMO_LEGACY`) column widths
+  - boundary labels landed here as free functions (`BandLabels`,
+    `zpn_label`/`frac_label`/`boundary_label`/`trim_name`);
+    parked `tmp/` file consumed and removed
+  - `src/numfmt.rs`: `fmt_commas`/`fmt_commas_f64` in
+    iiac-perf's shape — own module as a future separate-crate
+    candidate
+  - a drafted `no_std` renderer was rejected as machinery
+    serving nobody (devices ship structs, services render)
 - [[N]] 0.1.3-7 refactor: h2demo on library report path
   - demo ~288 → ~60 lines, gated on output identical to today's
     at matching ladder depths
@@ -158,3 +165,4 @@ and older `## Done` sections are moved to [done.md](notes/done.md) to keep this 
 [8]: https://github.com/winksaville/h2hist/commit/a6f7444a0bf7 "a6f7444a0bf72c547cd9c286c914477fd9680970"
 [9]: https://github.com/winksaville/h2hist/commit/469c841ae7c5 "469c841ae7c5a2708bc092a2e91865e3f76b4fcd"
 [10]: https://github.com/winksaville/h2hist/commit/123a32ccdd26 "123a32ccdd265d2954ab0f28baebaec9b2ff81c2"
+[11]: https://github.com/winksaville/h2hist/commit/20c59cdd5db8 "20c59cdd5db8f35f36e782deb0340346a37f4b5f"

@@ -17,6 +17,10 @@ mod bands;
 mod config;
 mod counter;
 mod histogram;
+#[cfg(feature = "std")]
+mod numfmt;
+#[cfg(feature = "std")]
+mod report;
 mod stats;
 mod table;
 
@@ -26,5 +30,11 @@ pub use bands::{Band, BandAssign, Boundary, Ladder, LadderIter, MidRank, RankSpl
 pub use config::{Config, Error};
 pub use counter::Counter;
 pub use histogram::Histogram;
+#[cfg(feature = "std")]
+pub use numfmt::{fmt_commas, fmt_commas_f64};
+#[cfg(feature = "std")]
+pub use report::{
+    BandLabels, Layout, boundary_label, frac_label, render_band_table, trim_name, zpn_label,
+};
 pub use stats::Stats;
 pub use table::BandTable;
