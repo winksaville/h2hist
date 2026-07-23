@@ -23,6 +23,10 @@ pub enum Error {
     StorageLen,
     /// Operation requires identical configs (e.g. merge).
     ConfigMismatch,
+    /// Band-ladder tail depth outside `2..=19` — below 2 the
+    /// tail vanishes into the deciles, above 19 the
+    /// `10^depth` fence math leaves u64.
+    BandDepth,
 }
 
 /// The two h2 powers plus the index math they induce.

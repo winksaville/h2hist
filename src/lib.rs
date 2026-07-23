@@ -13,12 +13,14 @@
 
 mod analysis;
 mod array;
+mod bands;
 mod config;
 mod counter;
 mod histogram;
 
 pub use analysis::{Bucket, Buckets};
 pub use array::HistogramArray;
+pub use bands::{Boundary, Ladder, LadderIter};
 pub use config::{Config, Error};
 pub use counter::Counter;
 pub use histogram::Histogram;

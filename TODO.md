@@ -39,10 +39,10 @@ Everything practical stays `no_std`: the new modules build report
 reverses ARCHITECTURE.md's "band-table reporting stays in tprobe"
 decision — see [[5]].
 
-- [[N]] 0.1.3-0 chore: band report cycle setup (done)
+- [[6]] 0.1.3-0 chore: band report cycle setup (done)
   - version-of-record, this ladder, chores section, the
     ARCHITECTURE.md reversal, and the iiac-perf adoption todo
-- [[N]] 0.1.3-1 refactor: dev module for test, bench, demo (done)
+- [[7]] 0.1.3-1 refactor: dev module for test, bench, demo (done)
   - `dev/{mod,consts,rng,stream}.rs` behind one `#[path]`
     include per consumer; retires 3 `SplitMix64` copies, 3
     stream copies, and the scattered `(7, 30)` / seed / sigfig
@@ -50,10 +50,12 @@ decision — see [[5]].
   - folds in the `src/` unit-test literals: each
     `Config::new(g, n)` + hand-computed `[C; N]` pair becomes
     `const C` + `const N: usize = C.total_buckets()`
-- [[N]] 0.1.3-2 feat: no_std band ladder and labels
-  - `src/bands.rs`: `Boundary`/`BoundaryKind`, const ladder from
-    `Z_DEPTH`/`N_DEPTH`, `BandLabels` with alloc-free label
-    writing; fences as integer rationals, so no `floor`/`powi`
+- [[N]] 0.1.3-2 feat: no_std band ladder (done)
+  - `src/bands.rs`: pure data and math — one `Boundary` enum
+    (Min/Z/P/N/Max), `Ladder` generated from two tail depths
+  - fences as integer rationals, so no `floor`/`powi`
+  - label rendering deliberately excluded: text belongs to the
+    render module, landing at `-6` (parked in `tmp/`)
 - [[N]] 0.1.3-3 feat: band assignment trait
   - `BandAssign` with `RankSplit` (h2demo's exact rank split)
     and `MidRank` (iiac-perf's right-closed Hazen mid-rank);
@@ -68,6 +70,9 @@ decision — see [[5]].
 - [[N]] 0.1.3-6 feat: band table rendering
   - `src/report.rs`: renders into any `core::fmt::Write` with
     two-pass width measurement; `std` adds the stdout convenience
+  - boundary labels land here (`BandLabels`, the `write_*`
+    methods and tests parked at `-2` in
+    `tmp/bands-with-labels-parked-for-0.1.3-6.rs`)
 - [[N]] 0.1.3-7 refactor: h2demo on library report path
   - demo ~288 → ~60 lines, gated on output identical to today's
     at matching ladder depths
@@ -140,3 +145,5 @@ and older `## Done` sections are moved to [done.md](notes/done.md) to keep this 
 [3]: notes/chores/chores-01.md#chore-rename-crate-to-h2hist
 [4]: notes/chores/chores-01.md#perf-record-path-inlining-read-time-total
 [5]: notes/chores/chores-01.md#feat-no_std-band-report-modules
+[6]: https://github.com/winksaville/h2hist/commit/ceee76323d71 "ceee76323d71b63dce642bdcb172563425d2f54f"
+[7]: https://github.com/winksaville/h2hist/commit/7e52a22dc7a7 "7e52a22dc7a7e1488c42a90215c2b2cf4b65af8c"

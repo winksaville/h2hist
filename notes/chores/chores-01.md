@@ -364,12 +364,12 @@ instead; the walk is off the hot path.
 
 ### As-built ladder
 
-- [[N]] 0.1.3-0 chore: band report cycle setup — version-of-record
+- [[13]] 0.1.3-0 chore: band report cycle setup — version-of-record
   to 0.1.3-0, the ladder into `## In Progress`, this chores section
   opened with its design subsections, the ARCHITECTURE.md reversal,
   and the iiac-perf adoption todo. Cycle runs on branch
   `refactor-common-modules`.
-- [[N]] 0.1.3-1 refactor: dev module for test, bench, demo — one
+- [[14]] 0.1.3-1 refactor: dev module for test, bench, demo — one
   `dev/` module (consts, rng, stream) behind a single `#[path]`
   include per consumer, plus the same const-derivation applied to
   the `src/` unit tests:
@@ -410,6 +410,32 @@ instead; the walk is off the hot path.
     problem does not arise. The `g=`/`n=`/`v=` labels *inside* assert messages stay
     as the h2 output notation. `examples/h2demo.rs` is left for the
     report-path rewrite (0.1.3-7).
+- [[N]] 0.1.3-2 feat: no_std band ladder — `src/bands.rs`, the
+  first report module, ported from iiac-perf's `bands.rs` and
+  reshaped as pure data and math (`no_std`, no-alloc):
+  - One `Boundary` enum (`Min`/`Z(k)`/`P(d)`/`N(k)`/`Max`)
+    instead of the planned `Boundary` + `BoundaryKind` pair —
+    the kind derives everything (fraction, rank), so a wrapper
+    struct had nothing left to hold.
+  - Fences are integer rationals: `fraction()` returns
+    `(num, den)` and `rank(total)` is `total * num / den` in
+    u128 — exact where iiac-perf's `(pct * total).floor()` is
+    approximate, and no `floor`/`powi` from `std`.
+  - No text: label rendering was drafted here, then pulled —
+    a boundary is device-side data (the wire artifact of the
+    ship-structs-to-a-service model); rendering it is the
+    render module's job. `BandLabels` and the `write_*`
+    methods land at `-6`, parked meanwhile in
+    `tmp/bands-with-labels-parked-for-0.1.3-6.rs` (a new
+    git-ignored `tmp/`).
+  - `Ladder` generates boundaries on demand from `(z_depth,
+    n_depth)` — no stored table; depths validated to `2..=19`
+    (new `Error::BandDepth`), `pow10` saturates as a backstop.
+  - Tests pin the z4/n10 ladder to iiac-perf's documented
+    boundary sequence, rational monotonicity by
+    cross-multiplication, exact ranks (incl. `u64::MAX`-scale
+    totals), and the demo's z4/n8 depths (21 boundaries: its
+    19 fences plus min/max).
 
 # References
 
@@ -425,3 +451,5 @@ instead; the walk is off the hot path.
 [10]: https://github.com/winksaville/h2hist/commit/18f2b9f10aee "18f2b9f10aee585b0d7a52180725db799dc1bdc4"
 [11]: https://github.com/winksaville/h2hist/commit/90ba3fe94d73 "90ba3fe94d73ae99b98235be13327dc97b1b76cb"
 [12]: https://github.com/winksaville/h2hist/commit/9a79e0eb1922 "9a79e0eb19225c9caeaf458d251dd574111b99e8"
+[13]: https://github.com/winksaville/h2hist/commit/ceee76323d71 "ceee76323d71b63dce642bdcb172563425d2f54f"
+[14]: https://github.com/winksaville/h2hist/commit/7e52a22dc7a7 "7e52a22dc7a7e1488c42a90215c2b2cf4b65af8c"
