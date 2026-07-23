@@ -12,7 +12,12 @@
 //!   lands with it (0.1.3-6).
 //! - `Ladder` generates the boundary sequence from its two
 //!   tail depths; deepening a tail is a one-argument change.
+//! - `BandAssign` distributes a bucket stream into the
+//!   ladder's bands; two conventions ship ([`RankSplit`] and
+//!   [`MidRank`]) because the demo and iiac-perf legitimately
+//!   disagree on where a fence-straddling bucket belongs.
 
+use crate::analysis::Bucket;
 use crate::config::Error;
 
 /// `10^exp`, saturating at `u64::MAX` (exp ≤ 19 is exact;
@@ -192,6 +197,161 @@ impl Iterator for LadderIter {
 
 impl ExactSizeIterator for LadderIter {}
 
+/// One band's accumulated stats. Band `i` spans the ranks
+/// between boundaries `i` and `i+1` of its ladder — labeled by
+/// the **upper** boundary, `(lower, upper]`.
+///
+/// - `first` / `last` — value bounds of the contributing
+///   buckets (lowest bucket low, highest bucket high).
+/// - `count` — occurrences assigned to this band.
+/// - `weighted_sum` — bucket-midpoint mass, the numerator of
+///   the band mean.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct Band {
+    /// Low end of the first contributing bucket's range.
+    pub first: u64,
+    /// High end of the last contributing bucket's range.
+    pub last: u64,
+    /// Occurrences assigned to this band.
+    pub count: u64,
+    /// Bucket-midpoint weighted mass.
+    pub weighted_sum: f64,
+}
+
+impl Band {
+    /// Fold `count` occurrences from a bucket spanning
+    /// `low..=high` into this band.
+    fn fold(&mut self, low: u64, high: u64, count: u64) {
+        if self.count == 0 {
+            self.first = low;
+        }
+        self.last = high;
+        self.count += count;
+        let mid = (low as f64 + high as f64) / 2.0;
+        self.weighted_sum += count as f64 * mid;
+    }
+}
+
+/// Distribute one bucket's counts into a ladder's bands.
+///
+/// - Called once per bucket, ascending, over one full pass of
+///   a histogram's [`Buckets`](crate::Buckets) iterator; the
+///   implementation may keep walk state, so use a fresh value
+///   per pass.
+/// - `bands.len()` must be `ladder.len() - 1`; band `i` is
+///   capped by boundary `i + 1`.
+pub trait BandAssign {
+    /// Fold `bucket` into `bands`.
+    fn assign(&mut self, bucket: &Bucket, total: u64, ladder: &Ladder, bands: &mut [Band]);
+}
+
+/// Exact rank-split assignment (the demo's convention).
+///
+/// A bucket's rank span `(cumulative - count, cumulative]` is
+/// split across every fence it crosses, so band counts are
+/// exact rank spans — a band's `count` is precisely how many
+/// ranks fall inside its fences, at the cost of a bucket's
+/// value range landing in several bands.
+#[derive(Debug, Default)]
+pub struct RankSplit {
+    band_index: usize,
+}
+
+impl RankSplit {
+    /// Fresh walk state for one pass.
+    pub fn new() -> RankSplit {
+        RankSplit::default()
+    }
+}
+
+impl BandAssign for RankSplit {
+    fn assign(&mut self, bucket: &Bucket, total: u64, ladder: &Ladder, bands: &mut [Band]) {
+        if bucket.count == 0 {
+            return;
+        }
+        let start = bucket.cumulative - bucket.count + 1;
+        let end = bucket.cumulative;
+
+        // Walk the bucket's rank span and the fences in
+        // lockstep: a span can cross several fences, or a band
+        // can span several buckets.
+        let mut seg_start = start;
+        while seg_start <= end && self.band_index < bands.len() {
+            // Advance past bands whose end fence is below the
+            // segment.
+            let Some(upper) = ladder.get(self.band_index + 1) else {
+                break;
+            };
+            let band_end = upper.rank(total);
+            if band_end < seg_start {
+                self.band_index += 1;
+                continue;
+            }
+            let seg_end = if end < band_end { end } else { band_end };
+            if let Some(band) = bands.get_mut(self.band_index) {
+                band.fold(bucket.low, bucket.high, seg_end - seg_start + 1);
+            }
+            if seg_end == band_end {
+                self.band_index += 1;
+            }
+            seg_start = seg_end + 1;
+        }
+    }
+}
+
+/// Whole-bucket mid-rank assignment (iiac-perf's convention).
+///
+/// Each bucket goes wholly to the band containing its Hazen
+/// mid-rank `(cumulative_before + count/2) / total`, bands
+/// right-closed `(lower, upper]` — a rank exactly on a fence
+/// falls in the band that fence caps. Band counts are
+/// approximate when buckets are coarse, but a bucket's values
+/// never split across bands.
+///
+/// The comparison is done in integers (u128 cross-multiply
+/// against the fence rational), so it is exact where a float
+/// `pct` compare has ulp slack; products saturate as a
+/// backstop in regimes far beyond practical totals.
+#[derive(Debug, Default)]
+pub struct MidRank;
+
+impl MidRank {
+    /// Fresh (stateless) assigner for one pass.
+    pub fn new() -> MidRank {
+        MidRank
+    }
+}
+
+impl BandAssign for MidRank {
+    fn assign(&mut self, bucket: &Bucket, total: u64, ladder: &Ladder, bands: &mut [Band]) {
+        if bucket.count == 0 || total == 0 {
+            return;
+        }
+        // Twice the mid-rank numerator: 2*(cum_before) + count.
+        let mid2 = (2 * bucket.cumulative as u128) - bucket.count as u128;
+        // First band whose upper fence is at or above the
+        // mid-rank; the last band is the fallback.
+        let mut band_index = bands.len() - 1;
+        let mut index = 0;
+        while index < bands.len() {
+            if let Some(upper) = ladder.get(index + 1) {
+                let (num, den) = upper.fraction();
+                // mid2 / (2*total) <= num / den, cross-multiplied.
+                let lhs = mid2.saturating_mul(den as u128);
+                let rhs = (2 * total as u128).saturating_mul(num as u128);
+                if lhs <= rhs {
+                    band_index = index;
+                    break;
+                }
+            }
+            index += 1;
+        }
+        if let Some(band) = bands.get_mut(band_index) {
+            band.fold(bucket.low, bucket.high, bucket.count);
+        }
+    }
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)] // OK: tests panic on setup failure by design
 mod tests {
@@ -298,5 +458,150 @@ mod tests {
         assert_eq!(ladder.get(0), Some(Min));
         assert_eq!(ladder.get(ladder.len() - 2), Some(N(8)));
         assert_eq!(ladder.get(ladder.len() - 1), Some(Max));
+    }
+
+    /// A bucket whose rank span is the whole run: the two
+    /// conventions legitimately disagree — `RankSplit` spreads
+    /// the counts across every band's exact rank span,
+    /// `MidRank` drops the whole bucket in the p50 band.
+    #[test]
+    fn conventions_disagree_on_straddling_bucket() {
+        let ladder = Ladder::new(2, 2).unwrap(); // 13 bounds, 12 bands
+        let bucket = Bucket {
+            low: 5,
+            high: 5,
+            count: 100,
+            cumulative: 100,
+        };
+
+        let mut split_bands = [Band::default(); 12];
+        RankSplit::new().assign(&bucket, 100, &ladder, &mut split_bands);
+        let split_counts: Vec<u64> = split_bands.iter().map(|band| band.count).collect();
+        // Fences at ranks 1, 10, 20, .. 90, 99, 100.
+        assert_eq!(split_counts, [1, 9, 10, 10, 10, 10, 10, 10, 10, 10, 9, 1]);
+        assert_eq!(split_bands.iter().map(|band| band.count).sum::<u64>(), 100);
+
+        let mut mid_bands = [Band::default(); 12];
+        MidRank::new().assign(&bucket, 100, &ladder, &mut mid_bands);
+        let mid_counts: Vec<u64> = mid_bands.iter().map(|band| band.count).collect();
+        // Mid-rank 0.5, right-closed: all 100 in the p50 band.
+        assert_eq!(mid_counts, [0, 0, 0, 0, 0, 100, 0, 0, 0, 0, 0, 0]);
+    }
+
+    /// Mid-rank exactly on a fence lands in the band that
+    /// fence caps (right-closed), mirroring iiac-perf's
+    /// `band_index` cases.
+    #[test]
+    fn mid_rank_right_closed() {
+        let ladder = Ladder::new(2, 2).unwrap();
+        // Band indices: 0 z2, 1 p10, .. 9 p90, 10 n2, 11 max.
+        let cases = [
+            (50u64, 20u64, 4usize), // mid 0.40 → exactly the p40 fence
+            (100, 2, 10),           // mid 0.99 → exactly the n2 fence
+            (50, 10, 5),            // mid 0.45 → interior, p50 band
+            (100, 100, 5),          // mid 0.50 → exactly the p50 fence
+        ];
+        for (cumulative, count, expected_band) in cases {
+            let bucket = Bucket {
+                low: 7,
+                high: 7,
+                count,
+                cumulative,
+            };
+            let mut bands = [Band::default(); 12];
+            MidRank::new().assign(&bucket, 100, &ladder, &mut bands);
+            for (index, band) in bands.iter().enumerate() {
+                let expected = if index == expected_band { count } else { 0 };
+                assert_eq!(
+                    band.count, expected,
+                    "cum={cumulative} count={count} band={index}"
+                );
+            }
+        }
+    }
+
+    /// A full histogram pass: `RankSplit` partitions the total
+    /// exactly (fence spans with zero ranks stay empty),
+    /// `MidRank` conserves the total; the top value splits
+    /// them (max band vs n2 band).
+    #[test]
+    fn full_pass_over_histogram_buckets() {
+        use crate::{Config, Histogram};
+        const CFG: Config = match Config::new(2, 8) {
+            Ok(config) => config,
+            Err(_) => panic!("invalid test config"),
+        };
+        const BUCKETS: usize = CFG.total_buckets();
+        let mut counts = [0u32; BUCKETS];
+        let mut hist = Histogram::new(CFG, &mut counts).unwrap();
+        for value in 0..10u64 {
+            hist.record(value);
+        }
+
+        let ladder = Ladder::new(2, 2).unwrap();
+        let total = hist.total();
+
+        let mut split_bands = [Band::default(); 12];
+        let mut splitter = RankSplit::new();
+        for bucket in hist.buckets() {
+            splitter.assign(&bucket, total, &ladder, &mut split_bands);
+        }
+        let split_counts: Vec<u64> = split_bands.iter().map(|band| band.count).collect();
+        // total=10: z2 fence rank 0 (empty), deciles rank 1..9,
+        // n2 fence rank 9 (empty span), max takes rank 10.
+        assert_eq!(split_counts, [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1]);
+
+        let mut mid_bands = [Band::default(); 12];
+        let mut mid = MidRank::new();
+        for bucket in hist.buckets() {
+            mid.assign(&bucket, total, &ladder, &mut mid_bands);
+        }
+        assert_eq!(mid_bands.iter().map(|band| band.count).sum::<u64>(), 10);
+        // Values 8 and 9 share one bucket (the exact region
+        // ends at 7); its mid-rank is exactly 0.9 → the whole
+        // pair lands in the p90 band, while RankSplit put
+        // rank 10 in the max band — the conventions split the
+        // top of this run differently.
+        assert_eq!(mid_bands[9].count, 2);
+        assert_eq!(mid_bands[10].count, 0);
+        assert_eq!(mid_bands[11].count, 0);
+    }
+
+    /// `Band::fold` semantics via assignment: first/last track
+    /// the contributing buckets' bounds, weighted_sum their
+    /// midpoint mass; empty buckets change nothing.
+    #[test]
+    fn band_fold_bounds_and_mass() {
+        let ladder = Ladder::new(2, 2).unwrap();
+        let mut bands = [Band::default(); 12];
+        let mut mid = MidRank::new();
+        // Two buckets, both mid-rank interior to the p50 band.
+        let first = Bucket {
+            low: 10,
+            high: 11,
+            count: 3,
+            cumulative: 44,
+        };
+        let second = Bucket {
+            low: 12,
+            high: 13,
+            count: 4,
+            cumulative: 48,
+        };
+        let empty = Bucket {
+            low: 14,
+            high: 15,
+            count: 0,
+            cumulative: 48,
+        };
+        mid.assign(&first, 100, &ladder, &mut bands);
+        mid.assign(&second, 100, &ladder, &mut bands);
+        mid.assign(&empty, 100, &ladder, &mut bands);
+        let band = &bands[5];
+        assert_eq!(band.first, 10);
+        assert_eq!(band.last, 13);
+        assert_eq!(band.count, 7);
+        let expected = 3.0 * 10.5 + 4.0 * 12.5;
+        assert!((band.weighted_sum - expected).abs() < 1e-9);
     }
 }

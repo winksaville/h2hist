@@ -410,7 +410,7 @@ instead; the walk is off the hot path.
     problem does not arise. The `g=`/`n=`/`v=` labels *inside* assert messages stay
     as the h2 output notation. `examples/h2demo.rs` is left for the
     report-path rewrite (0.1.3-7).
-- [[N]] 0.1.3-2 feat: no_std band ladder — `src/bands.rs`, the
+- [[15]] 0.1.3-2 feat: no_std band ladder — `src/bands.rs`, the
   first report module, ported from iiac-perf's `bands.rs` and
   reshaped as pure data and math (`no_std`, no-alloc):
   - One `Boundary` enum (`Min`/`Z(k)`/`P(d)`/`N(k)`/`Max`)
@@ -436,6 +436,26 @@ instead; the walk is off the hot path.
     cross-multiplication, exact ranks (incl. `u64::MAX`-scale
     totals), and the demo's z4/n8 depths (21 boundaries: its
     19 fences plus min/max).
+- [[N]] 0.1.3-3 feat: band assignment trait — `BandAssign` in
+  `bands.rs`, distributing a bucket stream into a ladder's
+  bands, with both source conventions as impls:
+  - `Band` is the accumulator (first/last/count/weighted_sum,
+    midpoint mass) — band `i` spans `(boundary i, boundary
+    i+1]`, labeled by the upper fence, matching both sources.
+  - `RankSplit` (the demo's convention): a bucket's rank span
+    splits across every fence it crosses — band counts are
+    exact rank spans; keeps walk state, fresh value per pass.
+  - `MidRank` (iiac-perf's): whole bucket to the band holding
+    its Hazen mid-rank, right-closed. The compare is integer
+    (u128 cross-multiply against the fence rational) — exact
+    where iiac-perf's f64 `pct` compare has ulp slack;
+    saturating backstop far beyond practical totals.
+  - Tests pin a legitimate disagreement (one bucket spanning
+    the whole run: RankSplit spreads per-fence, MidRank drops
+    all in p50), right-closed fence cases mirroring
+    iiac-perf's `band_index` test, a full histogram pass where
+    the two split the run's top differently, and fold
+    semantics (bounds, midpoint mass, empty buckets inert).
 
 # References
 
@@ -453,3 +473,4 @@ instead; the walk is off the hot path.
 [12]: https://github.com/winksaville/h2hist/commit/9a79e0eb1922 "9a79e0eb19225c9caeaf458d251dd574111b99e8"
 [13]: https://github.com/winksaville/h2hist/commit/ceee76323d71 "ceee76323d71b63dce642bdcb172563425d2f54f"
 [14]: https://github.com/winksaville/h2hist/commit/7e52a22dc7a7 "7e52a22dc7a7e1488c42a90215c2b2cf4b65af8c"
+[15]: https://github.com/winksaville/h2hist/commit/a6f7444a0bf7 "a6f7444a0bf72c547cd9c286c914477fd9680970"
