@@ -1,4 +1,4 @@
-# histogram-no-std
+# h2hist
 
 A `no_std`, no-alloc implementation of iopsystems'
 [h2 histogram](https://h2histogram.org/) — their base-2

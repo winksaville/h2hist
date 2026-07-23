@@ -38,21 +38,13 @@ _No cycle currently in progress._
  detail goes in `notes/chores/chores-NN.md` design
  subsections (link via `[N]` ref).
 
-1. **Crate rename to h2histogram-no-std.** Decided at 0.1.0
-   close-out: the current name claims a generic space; the
-   new one names the algorithm (like `sha2`, `argon2`) and
-   keeps `no_std` searchable. Both names unclaimed on
-   crates.io as of 2026-07-22. Covers: GitHub repo rename,
-   local dir rename + bot-repo symlink re-key, Cargo.toml
-   package name, self-reference sweep. Own chore cycle,
-   before tprobe adoption hard-codes the name.
-2. **Buffer-swap servicing model.** Today a probe has one
+1. **Buffer-swap servicing model.** Today a probe has one
    histogram recorded to completion. Future: a 1-bit
    "needs service soon" signal per probe; a background task
    hands over a fresh zeroed buffer and takes the full one
    for analysis. Deferred with no hard decisions; the
    config/storage split keeps it open. See [[1]].
-3. **tprobe adoption.** Replace `hdrhistogram` in tprobe's
+2. **tprobe adoption.** Replace `hdrhistogram` in tprobe's
    `examples/tp_pc`, then adopt in its core recording path.
    The integration cycle runs in tprobe's repo; this entry
    tracks API gaps it surfaces here.
@@ -76,8 +68,10 @@ Completed tasks are moved from `## Todo` to here, `## Done`, as they are complet
 and older `## Done` sections are moved to [done.md](notes/done.md) to keep this file small.
 
 - feat: no_std h2 histogram core [[2]]
+- chore: rename crate to h2hist [[3]]
 
 # References
 
 [1]: notes/chores/chores-01.md#deferred-buffer-swap-servicing-model
 [2]: notes/chores/chores-01.md#feat-no_std-h2-histogram-core
+[3]: notes/chores/chores-01.md#chore-rename-crate-to-h2hist

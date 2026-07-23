@@ -9,7 +9,7 @@
 //!   `cumulative` field, except the closing p50/p99/p99.9/max
 //!   line, which uses `quantile()` as intended for spot reads.
 
-use histogram_no_std::{Config, Histogram};
+use h2hist::{Config, Histogram};
 
 /// Deterministic 64-bit PRNG (splitmix64); same shape as the
 /// oracle suite in `tests/oracle.rs`.
@@ -259,12 +259,12 @@ fn print_table(h: &Histogram<'_, u32>) {
 
 /// Build the histogram, record samples, and print the demo
 /// report.
-fn main() -> Result<(), histogram_no_std::Error> {
+fn main() -> Result<(), h2hist::Error> {
     let cfg = Config::new(7, 30)?;
     let mut storage = vec![0u32; cfg.total_buckets()];
     let mut h = Histogram::new(cfg, &mut storage)?;
 
-    println!("h2demo — histogram-no-std band table");
+    println!("h2demo — h2hist band table");
     println!(
         "config: g=7 n=30 buckets={} bytes={}",
         cfg.total_buckets(),

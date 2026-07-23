@@ -11,7 +11,7 @@
 
 #![allow(clippy::unwrap_used)] // OK: tests panic on setup failure by design
 
-use histogram_no_std::{Config, Histogram};
+use h2hist::{Config, Histogram};
 
 /// Deterministic 64-bit PRNG (splitmix64).
 struct SplitMix64(u64);

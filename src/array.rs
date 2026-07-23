@@ -19,7 +19,7 @@ use crate::histogram::{Histogram, record_into};
 /// `const` config:
 ///
 /// ```
-/// use histogram_no_std::{Config, HistogramArray};
+/// use h2hist::{Config, HistogramArray};
 ///
 /// const CFG: Config = match Config::new(4, 36) {
 ///     Ok(c) => c,

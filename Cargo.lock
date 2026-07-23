@@ -15,6 +15,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 
 [[package]]
+name = "h2hist"
+version = "0.1.1"
+dependencies = [
+ "hdrhistogram",
+ "histogram",
+]
+
+[[package]]
 name = "hdrhistogram"
 version = "7.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -31,14 +39,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ebb5d42df947561c11a73414c53d14c4a0e3193e761a4cdca16ca3d941a2302"
 dependencies = [
  "thiserror",
-]
-
-[[package]]
-name = "histogram-no-std"
-version = "0.1.0"
-dependencies = [
- "hdrhistogram",
- "histogram",
 ]
 
 [[package]]

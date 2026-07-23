@@ -15,7 +15,7 @@ list (see
 
 ## feat: no_std h2 histogram core
 
-Commits:
+Commits: [[10]]
 
 A `no_std`, no-alloc, HdrHistogram-style log-linear histogram
 crate, to become tprobe's core recording structure. tprobe's
@@ -178,7 +178,7 @@ fixed footprint, per tprobe's round-3 verdict.
   harness=false) measures the record path; numbers and the
   extras-off decision in the design subsection above.
   README gains the no_std-check + bench section.
-- [[N]] 0.1.0 feat: no_std h2 histogram core — close-out
+- [[10]] 0.1.0 feat: no_std h2 histogram core — close-out
   bookkeeping (Done entry, chores finalization, version →
   0.1.0, README/ARCHITECTURE credit docs); non-ff merge
   into `main`.
@@ -203,14 +203,57 @@ off the hot path).
   2026-07-22). Runs as its own cycle next — see the TODO
   entry "Crate rename to h2histogram-no-std".
 
+## chore: rename crate to h2hist
+
+Commits:
+
+Rename `histogram-no-std` → `h2hist` (crate, GitHub repo,
+local dir) and the bot repo `histogram-no-std.claude` →
+`h2hist.claude`. The old name claims a generic space and frames
+`no_std` — a capability the storage model enables — as the
+crate's identity. The name decision walked several candidates:
+
+- `h2histogram-no-std` — accurate lineage, but `-no-std`
+  frames a capability as the identity.
+- Bare `h2histogram` — rejected as presumptuous: it is the
+  algorithm's published identity
+  ([h2histogram.org](https://h2histogram.org/)), left
+  unclaimed.
+- `h2h-*`, `h2gram`, `h2histocore`, `h2datadist` — rejected
+  for losing the searchable `hist`/`histogram` stem or
+  reading as noise.
+- `h2hist` — chosen: h2 lineage + the universally understood
+  `hist` abbreviation, and hyphen-free so the crate name is
+  the import path (`use h2hist::Histogram`). Unclaimed on
+  crates.io as of 2026-07-22 (as were all candidates;
+  bare `hist` is taken).
+
+On "frequency distribution" (a considered synonym): in
+statistics *frequency* means occurrence count, so the term is
+technically what a histogram stores — but in a systems/latency
+context "frequency" reads as Hz, so the histogram stem stays.
+
+A single-commit cycle (bare 0.1.1, Preparation omitted): the
+crate/package rename, self-reference sweep, GitHub repo
+rename's URL sweep, the 0.1.0 backfill ([[10]]), and this
+section land together. Outside the commit, as env steps: the
+GitHub renames (`h2hist`, `h2hist.claude` — the latter delayed
+by a GitHub API outage during the cycle), both repos' remote
+URL updates (`.git/config` is sandbox-protected), the local
+dir rename, and the bot-repo symlink re-key
+(`~/.claude/projects/…`) — then a fresh session under the new
+path key. Old GitHub URLs redirect, so recorded commit URLs
+and pushes survive the transition.
+
 # References
 
-[1]: https://github.com/winksaville/histogram-no-std/commit/45901cdb0b70 "45901cdb0b70a02f2dd32b03c78ddcb59d25293f"
-[2]: https://github.com/winksaville/histogram-no-std/commit/2f4c05cb1e38 "2f4c05cb1e38b0eff68454bae84392c8c86485fc"
-[3]: https://github.com/winksaville/histogram-no-std/commit/da442fcfc9cf "da442fcfc9cf7a950bb6b9430bb3b86fe158b457"
-[4]: https://github.com/winksaville/histogram-no-std/commit/ba474051f812 "ba474051f812c143b514cf348644483e329f9b1b"
-[5]: https://github.com/winksaville/histogram-no-std/commit/dcfa6c1f3271 "dcfa6c1f32713bb09c4efee062528945c5c5975b"
-[6]: https://github.com/winksaville/histogram-no-std/commit/ea4623857ee4 "ea4623857ee46f46d6bf4c5919d3925c83080482"
-[7]: https://github.com/winksaville/histogram-no-std/commit/ee3d537035ac "ee3d537035ac14923ed12e73cfce97ad693cf045"
-[8]: https://github.com/winksaville/histogram-no-std/commit/f950c382ef40 "f950c382ef40f313cea6c95cb282be4ae5f6fd16"
-[9]: https://github.com/winksaville/histogram-no-std/commit/d7ac06b84ad9 "d7ac06b84ad9f06285d0db6459ec2496ef507dd6"
+[1]: https://github.com/winksaville/h2hist/commit/45901cdb0b70 "45901cdb0b70a02f2dd32b03c78ddcb59d25293f"
+[2]: https://github.com/winksaville/h2hist/commit/2f4c05cb1e38 "2f4c05cb1e38b0eff68454bae84392c8c86485fc"
+[3]: https://github.com/winksaville/h2hist/commit/da442fcfc9cf "da442fcfc9cf7a950bb6b9430bb3b86fe158b457"
+[4]: https://github.com/winksaville/h2hist/commit/ba474051f812 "ba474051f812c143b514cf348644483e329f9b1b"
+[5]: https://github.com/winksaville/h2hist/commit/dcfa6c1f3271 "dcfa6c1f32713bb09c4efee062528945c5c5975b"
+[6]: https://github.com/winksaville/h2hist/commit/ea4623857ee4 "ea4623857ee46f46d6bf4c5919d3925c83080482"
+[7]: https://github.com/winksaville/h2hist/commit/ee3d537035ac "ee3d537035ac14923ed12e73cfce97ad693cf045"
+[8]: https://github.com/winksaville/h2hist/commit/f950c382ef40 "f950c382ef40f313cea6c95cb282be4ae5f6fd16"
+[9]: https://github.com/winksaville/h2hist/commit/d7ac06b84ad9 "d7ac06b84ad9f06285d0db6459ec2496ef507dd6"
+[10]: https://github.com/winksaville/h2hist/commit/18f2b9f10aee "18f2b9f10aee585b0d7a52180725db799dc1bdc4"

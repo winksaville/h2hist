@@ -12,7 +12,7 @@
 use std::hint::black_box;
 use std::time::Instant;
 
-use histogram_no_std::{Config, Error, Histogram};
+use h2hist::{Config, Error, Histogram};
 
 /// Samples per pass.
 const LEN: usize = 8_000_000;
