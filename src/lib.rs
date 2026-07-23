@@ -18,6 +18,7 @@ mod config;
 mod counter;
 mod histogram;
 mod stats;
+mod table;
 
 pub use analysis::{Bucket, Buckets};
 pub use array::HistogramArray;
@@ -26,3 +27,4 @@ pub use config::{Config, Error};
 pub use counter::Counter;
 pub use histogram::Histogram;
 pub use stats::Stats;
+pub use table::BandTable;

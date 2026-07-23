@@ -456,7 +456,7 @@ instead; the walk is off the hot path.
     iiac-perf's `band_index` test, a full histogram pass where
     the two split the run's top differently, and fold
     semantics (bounds, midpoint mass, empty buckets inert).
-- [[N]] 0.1.3-4 feat: midpoint-weighted mean and variance —
+- [[17]] 0.1.3-4 feat: midpoint-weighted mean and variance —
   `src/stats.rs`, the summary-stat module:
   - `Stats { count, mean, variance }` over a rank window
     `(lo, hi]` — one primitive covers the overall row
@@ -474,6 +474,26 @@ instead; the walk is off the hot path.
   - `from_buckets` / `from_window` take a `Fn() -> Iterator`
     so the two passes re-create the stream — `|| h.buckets()`
     for the histogram types, any mapped stream for adopters.
+- [[N]] 0.1.3-5 feat: band table structure — `src/table.rs`,
+  the assembled ship-structs-to-a-service artifact:
+  - `BandTable<CAP>`: bands + overall + trimmed `Stats` +
+    the populated trim extent, all numbers; rendering waits
+    for `-6`.
+  - `CAP` is a const generic sized by the new
+    `Ladder::band_count()` (const), so a `const Ladder` sizes
+    its table at compile time — same pattern as
+    `Config::total_buckets()` sizing counts storage.
+  - `build` is generic over `BandAssign`, so either
+    convention assembles the same structure; several cheap
+    passes over a re-creatable stream (total, assignment,
+    two-pass stats) rather than one heavier fused pass.
+  - Trim anchor is the n2 fence: trimmed stats over
+    `(0, rank(n2)]`, `trim_range()` naming the populated
+    extent below the cut by upper boundary (`Error` grows
+    `TableCapacity`).
+  - Tests: table equals manual assignment + Stats windows,
+    trim extent naming, MidRank total conservation, capacity
+    rejection, zeroed empty table.
 
 # References
 
@@ -493,3 +513,4 @@ instead; the walk is off the hot path.
 [14]: https://github.com/winksaville/h2hist/commit/7e52a22dc7a7 "7e52a22dc7a7e1488c42a90215c2b2cf4b65af8c"
 [15]: https://github.com/winksaville/h2hist/commit/a6f7444a0bf7 "a6f7444a0bf72c547cd9c286c914477fd9680970"
 [16]: https://github.com/winksaville/h2hist/commit/469c841ae7c5 "469c841ae7c5a2708bc092a2e91865e3f76b4fcd"
+[17]: https://github.com/winksaville/h2hist/commit/123a32ccdd26 "123a32ccdd265d2954ab0f28baebaec9b2ff81c2"

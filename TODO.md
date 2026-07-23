@@ -61,15 +61,16 @@ decision — see [[5]].
     and `MidRank` (iiac-perf's right-closed Hazen mid-rank)
   - `Band` accumulator (first/last/count/weighted_sum)
   - tests pin a case where the two legitimately disagree
-- [[N]] 0.1.3-4 feat: midpoint-weighted mean and variance (done)
+- [[10]] 0.1.3-4 feat: midpoint-weighted mean and variance (done)
   - `src/stats.rs`: `Stats` (count/mean/variance) over a rank
     window `(lo, hi]` — overall, tail-trimmed, and core windows
     are all the same primitive
   - two-pass variance, avoiding the `sumsq/n - mean²`
     cancellation the demo has today; `stdev()` under `std`
-- [[N]] 0.1.3-5 feat: band table structure
-  - `src/table.rs`: fixed-capacity `BandTable` built in one pass
-    over `Buckets`
+- [[N]] 0.1.3-5 feat: band table structure (done)
+  - `src/table.rs`: fixed-capacity `BandTable` — bands + overall
+    + trimmed stats + trim range, assembled from a re-creatable
+    bucket stream; `CAP` from a `const Ladder::band_count()`
 - [[N]] 0.1.3-6 feat: band table rendering
   - `src/report.rs`: renders into any `core::fmt::Write` with
     two-pass width measurement; `std` adds the stdout convenience
@@ -127,6 +128,10 @@ decision — see [[5]].
 - HdrHistogram V2 wire/log format compatibility (zigzag
   LEB128 is `no_std`-fine; compression needs a dep).
 - `alloc` feature: Vec-backed storage, auto-resize.
+- Terminal histogram / bar-chart renderer over
+  `Buckets`/`BandTable` (a graph, not a table); count-axis
+  scaling (log or max-normalized) and a CDF percentile-plot
+  variant TBD.
 
 ## Bugs
 
@@ -152,3 +157,4 @@ and older `## Done` sections are moved to [done.md](notes/done.md) to keep this 
 [7]: https://github.com/winksaville/h2hist/commit/7e52a22dc7a7 "7e52a22dc7a7e1488c42a90215c2b2cf4b65af8c"
 [8]: https://github.com/winksaville/h2hist/commit/a6f7444a0bf7 "a6f7444a0bf72c547cd9c286c914477fd9680970"
 [9]: https://github.com/winksaville/h2hist/commit/469c841ae7c5 "469c841ae7c5a2708bc092a2e91865e3f76b4fcd"
+[10]: https://github.com/winksaville/h2hist/commit/123a32ccdd26 "123a32ccdd265d2954ab0f28baebaec9b2ff81c2"
