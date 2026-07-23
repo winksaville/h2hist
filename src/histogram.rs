@@ -13,34 +13,37 @@ use crate::config::{Config, Error};
 use crate::counter::Counter;
 
 /// Shared record-path core for the borrowed and owned types:
-/// index `value`, saturating-add `n` into its bucket, bump
-/// `total`. The `get_mut` guard makes the panic path
+/// index `value`, saturating-add `n` into its bucket. Nothing
+/// else — totals are computed at read time so the hot path
+/// stays minimal. The `get_mut` guard makes the panic path
 /// unreachable (index invariant proven by the config tests).
 #[inline]
-pub(crate) fn record_into<C: Counter>(
-    config: &Config,
-    counts: &mut [C],
-    total: &mut u64,
-    value: u64,
-    n: u64,
-) {
+pub(crate) fn record_into<C: Counter>(config: &Config, counts: &mut [C], value: u64, n: u64) {
     let idx = config.index_for(value);
     if let Some(c) = counts.get_mut(idx) {
         *c = c.sat_add(n);
-        *total = total.saturating_add(n);
     }
+}
+
+/// Saturating sum of a counts slice — the read-time `total`
+/// shared by the borrowed and owned types.
+pub(crate) fn total_of<C: Counter>(counts: &[C]) -> u64 {
+    let mut total = 0u64;
+    for c in counts {
+        total = total.saturating_add(c.to_u64());
+    }
+    total
 }
 
 /// A log-linear histogram over caller-supplied counts storage.
 ///
 /// - `config` — the h2 powers and index math.
 /// - `counts` — exactly `config.total_buckets()` counters.
-/// - `total` — saturating sum of all recorded counts (u64),
-///   maintained on the record path for O(1) rank math later.
+/// - No derived state: totals are computed from the counts at
+///   read time, keeping the record path minimal.
 #[derive(Debug)]
 pub struct Histogram<'a, C: Counter = u32> {
     config: Config,
-    total: u64,
     counts: &'a mut [C],
 }
 
@@ -51,21 +54,13 @@ impl<'a, C: Counter> Histogram<'a, C> {
     ///   ([`Error::StorageLen`] otherwise).
     /// - Storage is not zeroed here: pre-zeroed storage (or a
     ///   reused slice from a previous run) is the caller's
-    ///   contract; `total` is recomputed from the counts so a
-    ///   handed-back slice stays consistent.
+    ///   contract; totals are read from the counts on demand,
+    ///   so a handed-back slice is consistent as-is.
     pub fn new(config: Config, counts: &'a mut [C]) -> Result<Self, Error> {
         if counts.len() != config.total_buckets() {
             return Err(Error::StorageLen);
         }
-        let mut total = 0u64;
-        for c in counts.iter() {
-            total = total.saturating_add(c.to_u64());
-        }
-        Ok(Histogram {
-            config,
-            total,
-            counts,
-        })
+        Ok(Histogram { config, counts })
     }
 
     /// The config this histogram was built with.
@@ -73,9 +68,11 @@ impl<'a, C: Counter> Histogram<'a, C> {
         self.config
     }
 
-    /// Saturating sum of all recorded counts.
+    /// Saturating sum of all bucket counts. O(buckets):
+    /// computed at read time to keep the record path minimal,
+    /// so a saturated counter's overflow is not reflected here.
     pub fn total(&self) -> u64 {
-        self.total
+        total_of(self.counts)
     }
 
     /// Record one occurrence of `value`. O(1), never panics;
@@ -90,7 +87,7 @@ impl<'a, C: Counter> Histogram<'a, C> {
     /// [`record`](Histogram::record).
     #[inline]
     pub fn record_n(&mut self, value: u64, n: u64) {
-        record_into(&self.config, self.counts, &mut self.total, value, n);
+        record_into(&self.config, self.counts, value, n);
     }
 
     /// Count in bucket `index`, widened to u64; `None` past
@@ -117,15 +114,13 @@ impl<'a, C: Counter> Histogram<'a, C> {
     /// one-sided error ≤ 2⁻ᵍ). `None` when empty or `q` is
     /// out of range (NaN included).
     pub fn quantile(&self, q: f64) -> Option<u64> {
-        quantile_of(&self.config, self.counts, self.total, q)
+        quantile_of(&self.config, self.counts, q)
     }
 
     /// Merge `other`'s counts into `self` (saturating);
     /// configs must be identical.
     pub fn merge_from(&mut self, other: &Histogram<'_, C>) -> Result<(), Error> {
-        let added = merge_into(&self.config, self.counts, &other.config, other.counts)?;
-        self.total = self.total.saturating_add(added);
-        Ok(())
+        merge_into(&self.config, self.counts, &other.config, other.counts)
     }
 }
 
@@ -184,12 +179,12 @@ mod tests {
         h.record(0);
         h.record(0);
         assert_eq!(h.count_at(0), Some(u8::MAX as u64));
-        // total still counts every record() call.
-        assert_eq!(h.total(), (u8::MAX - 1) as u64 + 3);
+        // total is the sum of counts, so it saturates with them.
+        assert_eq!(h.total(), u8::MAX as u64);
     }
 
     #[test]
-    fn rebind_recomputes_total() {
+    fn rebind_total_from_counts() {
         let c = cfg(2, 8);
         let mut counts = [0u32; 28];
         {
@@ -197,7 +192,7 @@ mod tests {
             h.record(3);
             h.record(200);
         }
-        // Rebind the same storage: total must be rebuilt.
+        // Rebind the same storage: total reads the counts.
         let h = Histogram::new(c, &mut counts).unwrap();
         assert_eq!(h.total(), 2);
     }

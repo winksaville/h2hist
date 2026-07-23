@@ -11,7 +11,7 @@
 use crate::analysis::{Buckets, merge_into, quantile_of};
 use crate::config::{Config, Error};
 use crate::counter::Counter;
-use crate::histogram::{Histogram, record_into};
+use crate::histogram::{Histogram, record_into, total_of};
 
 /// A histogram owning its counts inline.
 ///
@@ -32,7 +32,6 @@ use crate::histogram::{Histogram, record_into};
 #[derive(Debug)]
 pub struct HistogramArray<const N: usize, C: Counter = u32> {
     config: Config,
-    total: u64,
     counts: [C; N],
 }
 
@@ -45,7 +44,6 @@ impl<const N: usize, C: Counter> HistogramArray<N, C> {
         }
         Ok(HistogramArray {
             config,
-            total: 0,
             counts: [C::default(); N],
         })
     }
@@ -55,9 +53,10 @@ impl<const N: usize, C: Counter> HistogramArray<N, C> {
         self.config
     }
 
-    /// Saturating sum of all recorded counts.
+    /// Saturating sum of all bucket counts; semantics of
+    /// [`Histogram::total`] (O(buckets), read-time).
     pub fn total(&self) -> u64 {
-        self.total
+        total_of(&self.counts)
     }
 
     /// Record one occurrence of `value`; semantics of
@@ -71,7 +70,7 @@ impl<const N: usize, C: Counter> HistogramArray<N, C> {
     /// [`Histogram::record_n`].
     #[inline]
     pub fn record_n(&mut self, value: u64, n: u64) {
-        record_into(&self.config, &mut self.counts, &mut self.total, value, n);
+        record_into(&self.config, &mut self.counts, value, n);
     }
 
     /// Count in bucket `index`, widened to u64; `None` past
@@ -89,20 +88,18 @@ impl<const N: usize, C: Counter> HistogramArray<N, C> {
     /// Value at quantile `q`; semantics of
     /// [`Histogram::quantile`].
     pub fn quantile(&self, q: f64) -> Option<u64> {
-        quantile_of(&self.config, &self.counts, self.total, q)
+        quantile_of(&self.config, &self.counts, q)
     }
 
     /// Merge `other`'s counts into `self` (saturating);
     /// configs must be identical.
     pub fn merge_from(&mut self, other: &HistogramArray<N, C>) -> Result<(), Error> {
-        let added = merge_into(&self.config, &mut self.counts, &other.config, &other.counts)?;
-        self.total = self.total.saturating_add(added);
-        Ok(())
+        merge_into(&self.config, &mut self.counts, &other.config, &other.counts)
     }
 
     /// Borrow as the slice-backed [`Histogram`] view — one
-    /// analysis surface for both storage shapes. O(buckets)
-    /// (the view recomputes `total` from the counts).
+    /// analysis surface for both storage shapes. O(1): the
+    /// view is config + slice, no derived state to build.
     pub fn as_histogram(&mut self) -> Histogram<'_, C> {
         #[allow(clippy::unwrap_used)]
         // OK: N == total_buckets() was checked in new(), the

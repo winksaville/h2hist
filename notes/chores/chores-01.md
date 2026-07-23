@@ -205,7 +205,7 @@ off the hot path).
 
 ## chore: rename crate to h2hist
 
-Commits:
+Commits: [[11]]
 
 Rename `histogram-no-std` → `h2hist` (crate, GitHub repo,
 local dir) and the bot repo `histogram-no-std.claude` →
@@ -245,6 +245,62 @@ dir rename, and the bot-repo symlink re-key
 path key. Old GitHub URLs redirect, so recorded commit URLs
 and pushes survive the transition.
 
+## perf: record path inlining, read-time total
+
+Commits:
+
+A bench-driven record-path day (2026-07-22): added the
+iopsystems `histogram` crate to `benches/record` for a
+three-way comparison, then chased the gap it exposed until
+h2hist's record cost fell 2.57 → ~0.89 ns/record (Ryzen
+3900X) — faster than both oracles and than a raw streaming
+store. Landed as one squashed commit. Three independent wins,
+in discovery order:
+
+- Read-time total (~0.23 ns): `record_into` no longer
+  maintains a running total; `total()` / `quantile()` sum the
+  counts on demand (O(buckets), off the hot path). Semantic
+  change: total is now the saturating sum of bucket counts,
+  so a saturated counter's overflow is no longer reflected —
+  the cleaner invariant (total always agrees with the
+  counts, making the quantile fallback unreachable).
+- Exact-region-first `index_for` (~0.46 ns): the over-max
+  clamp moved after the exact-region test, so the common
+  small value pays one compare and no clamp. Equivalent
+  because over-max values are always ≥ 2^(g+1) when g < n
+  (enforced by `Config::new`).
+- `#[inline]` on Config's small const fns (~1 ns, the big
+  one): a non-generic fn without `#[inline]` cannot inline
+  across crates without LTO, so every external caller —
+  the bench, and tprobe to come — paid an indirect call
+  per record. Found by disassembling the bench loop after
+  the other fixes plateaued.
+
+### Bench methodology findings
+
+Lessons from the chase, recorded because they will recur:
+
+- Code-layout noise: identical loops swing ~±0.2 ns between
+  recompiles as alignment rolls; compare rows within one
+  run, never across binaries. Confirmed by benching a
+  duplicated identical loop and an `-align-all-blocks=6`
+  build.
+- Saturating vs wrapping add: no measurable difference —
+  the u32 sat-add compiles to `inc` + one `cmove`; a
+  branch-shaped source form emits identical code, so the
+  simpler `saturating_add` form stays.
+- The raw streaming store is not a lower bound: histogram
+  counts stay L1-resident while the store streams
+  `8 B x len` through DRAM, so h2hist records faster than
+  a raw store while costing zero bytes per sample.
+- Diagnostic rows added (`+ total`, `index_for + wrap u32`,
+  u64, and a `stored` width column for 32-bit-target
+  awareness); README's Bench section is the interpretation
+  guide so the bench doc and README cannot drift.
+- Hot-path extras repriced: inline min/max/sum now costs
+  ~0.4 ns/record over the 0.89 base (was ~0.7 over 2.6) —
+  standing data for the parked extras decision.
+
 # References
 
 [1]: https://github.com/winksaville/h2hist/commit/45901cdb0b70 "45901cdb0b70a02f2dd32b03c78ddcb59d25293f"
@@ -257,3 +313,4 @@ and pushes survive the transition.
 [8]: https://github.com/winksaville/h2hist/commit/f950c382ef40 "f950c382ef40f313cea6c95cb282be4ae5f6fd16"
 [9]: https://github.com/winksaville/h2hist/commit/d7ac06b84ad9 "d7ac06b84ad9f06285d0db6459ec2496ef507dd6"
 [10]: https://github.com/winksaville/h2hist/commit/18f2b9f10aee "18f2b9f10aee585b0d7a52180725db799dc1bdc4"
+[11]: https://github.com/winksaville/h2hist/commit/90ba3fe94d73 "90ba3fe94d73ae99b98235be13327dc97b1b76cb"

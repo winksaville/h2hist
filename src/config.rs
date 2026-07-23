@@ -58,22 +58,26 @@ impl Config {
     }
 
     /// The grouping power g.
+    #[inline]
     pub const fn grouping_power(&self) -> u8 {
         self.grouping_power
     }
 
     /// The max value power n.
+    #[inline]
     pub const fn max_value_power(&self) -> u8 {
         self.max_value_power
     }
 
     /// Largest trackable value, `2^n - 1`.
+    #[inline]
     pub const fn max_value(&self) -> u64 {
         u64::MAX >> (64 - self.max_value_power as u32)
     }
 
     /// Number of buckets, `(n - g + 1) * 2^g` — the exact
     /// counts-storage length this config requires.
+    #[inline]
     pub const fn total_buckets(&self) -> usize {
         (((self.max_value_power - self.grouping_power) as usize) + 1) << self.grouping_power
     }
@@ -81,15 +85,21 @@ impl Config {
     /// Bucket index for a value; values above
     /// [`max_value`](Config::max_value) clamp into the top
     /// bucket. O(1): a compare, a clz, two shifts.
+    ///
+    /// The exact-region test runs first so the common small
+    /// value pays one compare and no clamp; over-max values
+    /// are always ≥ `2^(g+1)` (g < n), so clamping only on
+    /// the log path is equivalent.
+    #[inline]
     pub const fn index_for(&self, value: u64) -> usize {
+        if value < (1u64 << (self.grouping_power + 1)) {
+            return value as usize;
+        }
         let v = if value > self.max_value() {
             self.max_value()
         } else {
             value
         };
-        if v < (1u64 << (self.grouping_power + 1)) {
-            return v as usize;
-        }
         let power = 63 - v.leading_zeros() as u8;
         let log_bucket = power - self.grouping_power;
         ((log_bucket as usize) << self.grouping_power)
@@ -100,6 +110,7 @@ impl Config {
     ///
     /// Callers must pass `index < total_buckets()`; the math
     /// is meaningless beyond it (no panic, garbage range).
+    #[inline]
     pub const fn value_range(&self, index: usize) -> (u64, u64) {
         if index < (1usize << (self.grouping_power + 1)) {
             return (index as u64, index as u64);

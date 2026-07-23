@@ -10,9 +10,9 @@ usable; see
 [Relation to iopsystems' histogram](#relation-to-iopsystems-histogram)
 for how it differs from their crate.
 
-Status: 0.1.0 cycle in progress (see [TODO.md](TODO.md));
-core, analysis, oracle tests, demo, no_std check, and bench
-have landed.
+Status: 0.1.2 (see [TODO.md](TODO.md)); core, analysis,
+oracle tests, demo, no_std check, and the comparison bench
+have landed; record path tuned (see [Bench](#bench)).
 
 ## Build and test
 
@@ -34,15 +34,76 @@ mean/stdev):
 - `cargo install --path . --example h2demo` — install the
   demo as a `h2demo` binary.
 
-## no_std check and bench
+## no_std check
 
 - `./scripts/check-no-std.sh` — builds the core
   (`--no-default-features`) for every installed bare-metal
   (`*-none-*`) target.
-- `cargo bench` — record-path cost vs a raw store and
-  `hdrhistogram` (hand-rolled harness; indicative numbers
-  and the resulting design decision are in
-  [chores-01](notes/chores/chores-01.md)).
+
+## Bench
+
+`cargo bench --bench record` times the record path over a
+pre-generated heavy-tailed stream (8M samples, `g=7 n=30`,
+3072 buckets) and reports best-of-3 ns/record per variant
+(hand-rolled harness, no criterion). Indicative output
+(AMD Ryzen 9 3900X):
+
+```text
+variant                stored       ns/record
+raw streaming store    u64 sample       0.931
+h2hist u32             u32 counter      0.881
+h2hist u32 + total     u32 counter      0.980
+h2hist u64             u64 counter      0.863
+index_for + wrap u32   u32 counter      0.811
+h2hist u32 + extras    u32 counter      1.305
+histogram u64          u64 counter      1.613
+hdrhistogram 2sf       u64 counter      4.965
+```
+
+The `stored` column names what the variant writes per
+record. On the x86_64 host the width is near-invisible, but
+it is the number that matters on a 32-bit target (a u64
+store/increment is two words on a Cortex-M, and the counts
+array doubles) — these host numbers do not transfer to
+embedded CPUs; measure on target.
+
+The rows and how to read them:
+
+- `raw streaming store` — the "keep every raw sample"
+  alternative: each sample written to the next slot of a
+  preallocated `Vec<u64>`, no bucketing. Not a lower bound:
+  it streams `8 B × len` through DRAM while a histogram's
+  counts stay L1-resident, so the histogram rows can (and
+  do) beat it — and it costs 8 B per sample where the
+  histogram costs zero.
+- `h2hist u32` — this crate as shipped: index + saturating
+  u32 bucket increment, nothing else (totals are summed at
+  read time, off the hot path).
+- `h2hist u32 + total` — diagnostic, not an API: the same
+  plus a caller-side running `saturating_add(1)` per record.
+  Documents the measured cost of the retired always-on total
+  and prices the keep-your-own-counter pattern for callers
+  who want a live total.
+- `h2hist u64` — counter-width check: u64 counters bench the
+  same as u32, so u32 stays the default on footprint alone.
+- `index_for + wrap u32` — diagnostic, not an API:
+  `Config::index_for` plus a plain wrapping add on a bare
+  slice — the index math alone. Matching `h2hist u32` shows
+  the saturating counter update costs nothing measurable.
+- `h2hist u32 + extras` — the same plus inline min/max/sum
+  tracking: the data for the parked hot-path-extras
+  decision.
+- `histogram u64` — iopsystems `histogram`, the same h2
+  scheme (the peer comparison; u64 heap-allocated counts).
+- `hdrhistogram 2sf` — the reference implementation at 2
+  significant figures (relative error ≤ 1%, close to g=7's
+  ≤ 0.78%), so the comparison runs at like precision.
+
+Caveats: a tight-loop microbench. Code-layout shifts between
+recompiles move individual rows by ~±0.2 ns, so compare rows
+within one run, not across binaries; treat the numbers as
+indicative, not rigorous. History and the resulting design
+decisions are in [chores-01](notes/chores/chores-01.md).
 
 ## Goals
 

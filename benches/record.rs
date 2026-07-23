@@ -1,13 +1,14 @@
 //! Record-path cost bench (hand-rolled, `harness = false`).
 //!
 //! - Times ns/record over a pre-generated heavy-tailed value
-//!   stream for: a raw streaming store (the ArrayRecorder
-//!   pattern), our u32 histogram, the same plus inline
-//!   min/max/sum tracking (the "hot-path extras" candidates),
-//!   and `hdrhistogram` — best of `REPS` passes each.
-//! - Purpose: absolute record cost vs alternatives, and the
-//!   marginal cost of the extras — the data for the parked
-//!   hot-path-extras decision.
+//!   stream; best of `REPS` passes per variant. The variant
+//!   list, how to interpret each row, and the caveats are
+//!   documented in README.md's Bench section.
+//! - Purpose: absolute record cost vs a raw store, the
+//!   iopsystems `histogram` crate (same h2 scheme), and
+//!   `hdrhistogram`; plus diagnostic rows isolating the
+//!   marginal cost of a hot-path total and the min/max/sum
+//!   extras — the data behind those design decisions.
 
 use std::hint::black_box;
 use std::time::Instant;
@@ -51,7 +52,11 @@ fn make_values(max_value: u64) -> Vec<u64> {
 }
 
 /// Best-of-REPS wall time of `f`, reported as ns per value.
-fn bench(label: &str, mut f: impl FnMut()) {
+///
+/// `stored` names what the variant writes per record (e.g.
+/// `u32 counter`, `u64 sample`) — the width that matters on
+/// 32-bit targets even when invisible on the x86_64 host.
+fn bench(label: &str, stored: &str, mut f: impl FnMut()) {
     let mut best = f64::MAX;
     for _ in 0..REPS {
         let t0 = Instant::now();
@@ -62,7 +67,7 @@ fn bench(label: &str, mut f: impl FnMut()) {
             best = per;
         }
     }
-    println!("{label:<22} {best:>8.3} ns/record");
+    println!("{label:<22} {stored:<12} {best:>9.3}");
 }
 
 /// Run all variants and print the comparison table.
@@ -76,9 +81,10 @@ fn main() -> Result<(), Error> {
         LEN,
         REPS
     );
+    println!("{:<22} {:<12} {:>9}", "variant", "stored", "ns/record");
 
     let mut store = vec![0u64; LEN];
-    bench("raw streaming store", || {
+    bench("raw streaming store", "u64 sample", || {
         for (slot, &v) in store.iter_mut().zip(values.iter()) {
             *slot = v;
         }
@@ -87,16 +93,46 @@ fn main() -> Result<(), Error> {
 
     let mut counts = vec![0u32; cfg.total_buckets()];
     let mut h = Histogram::new(cfg, &mut counts)?;
-    bench("histogram u32", || {
+    bench("h2hist u32", "u32 counter", || {
         for &v in &values {
             h.record(v);
         }
         black_box(h.total());
     });
 
+    let mut counts_t = vec![0u32; cfg.total_buckets()];
+    let mut ht = Histogram::new(cfg, &mut counts_t)?;
+    bench("h2hist u32 + total", "u32 counter", || {
+        let mut total = 0u64;
+        for &v in &values {
+            ht.record(v);
+            total = total.saturating_add(1);
+        }
+        black_box(total);
+    });
+
+    let mut counts64 = vec![0u64; cfg.total_buckets()];
+    let mut h64 = Histogram::<u64>::new(cfg, &mut counts64)?;
+    bench("h2hist u64", "u64 counter", || {
+        for &v in &values {
+            h64.record(v);
+        }
+        black_box(h64.total());
+    });
+
+    let mut raw_counts = vec![0u32; cfg.total_buckets()];
+    bench("index_for + wrap u32", "u32 counter", || {
+        for &v in &values {
+            if let Some(c) = raw_counts.get_mut(cfg.index_for(v)) {
+                *c = c.wrapping_add(1);
+            }
+        }
+        black_box(&raw_counts);
+    });
+
     let mut counts2 = vec![0u32; cfg.total_buckets()];
     let mut h2 = Histogram::new(cfg, &mut counts2)?;
-    bench("histogram u32 + extras", || {
+    bench("h2hist u32 + extras", "u32 counter", || {
         let (mut mn, mut mx, mut sum) = (u64::MAX, 0u64, 0u64);
         for &v in &values {
             h2.record(v);
@@ -107,9 +143,22 @@ fn main() -> Result<(), Error> {
         black_box((mn, mx, sum, h2.total()));
     });
 
+    match histogram::Histogram::new(7, 30) {
+        Ok(mut io) => {
+            bench("histogram u64", "u64 counter", || {
+                for &v in &values {
+                    // Values are pre-clamped, increment cannot fail.
+                    let _ = io.increment(v);
+                }
+                black_box(&io);
+            });
+        }
+        Err(e) => println!("histogram crate setup failed: {e:?}"),
+    }
+
     match hdrhistogram::Histogram::<u64>::new_with_bounds(1, cfg.max_value(), 2) {
         Ok(mut hdr) => {
-            bench("hdrhistogram 2sf", || {
+            bench("hdrhistogram 2sf", "u64 counter", || {
                 for &v in &values {
                     // Values are pre-clamped, record cannot fail.
                     let _ = hdr.record(v);

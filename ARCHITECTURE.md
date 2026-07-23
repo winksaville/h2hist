@@ -46,9 +46,10 @@ are separate, and the core histogram type *borrows* its counts.
 
 - `Config` — the two powers plus derived index math; `const fn`
   so callers can size storage at compile time.
-- `Histogram<'a, C>` — config + `&'a mut [C]` counts + totals.
-  The caller owns the memory: a static buffer, a stack array,
-  or (with `std`) a heap slice.
+- `Histogram<'a, C>` — config + `&'a mut [C]` counts; no
+  derived state (totals are summed at read time, keeping the
+  record path minimal). The caller owns the memory: a static
+  buffer, a stack array, or (with `std`) a heap slice.
 - `HistogramArray<const N, C>` — owned inline `[C; N]`
   convenience wrapper with a size check against
   `Config::total_buckets()`. Rust's stable const generics
@@ -94,7 +95,7 @@ impl Config {
 }
 
 pub struct Histogram<'a, C: Counter = u32> {
-    // config, total: u64, counts: &'a mut [C]
+    // config, counts: &'a mut [C]
 }
 impl<C: Counter> Histogram<'_, C> {
     pub fn record(&mut self, value: u64);
@@ -112,7 +113,7 @@ pub struct HistogramArray<const N: usize, C: Counter = u32> {
 ## Size tradeoffs
 
 `bytes = (n − g + 1) · 2ᵍ · sizeof(C)` + ~48 B header
-(total/min/max/config).
+(min/max/config if the hot-path extras are adopted).
 
 What a max value of 2ⁿ ticks spans in time depends on the tick
 source's rate:

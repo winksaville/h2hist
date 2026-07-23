@@ -83,13 +83,11 @@ impl<C: Counter> ExactSizeIterator for Buckets<'_, C> {}
 ///
 /// `None` when the histogram is empty or `q` is outside
 /// `[0.0, 1.0]` (NaN included). No `std` float intrinsics:
-/// the ceil is done by integer compare.
-pub(crate) fn quantile_of<C: Counter>(
-    config: &Config,
-    counts: &[C],
-    total: u64,
-    q: f64,
-) -> Option<u64> {
+/// the ceil is done by integer compare. O(buckets), two
+/// passes: `total` is summed from the counts first (nothing
+/// tracks it on the record path).
+pub(crate) fn quantile_of<C: Counter>(config: &Config, counts: &[C], q: f64) -> Option<u64> {
+    let total = crate::histogram::total_of(counts);
     if total == 0 || !(0.0..=1.0).contains(&q) {
         return None;
     }
@@ -109,30 +107,28 @@ pub(crate) fn quantile_of<C: Counter>(
             return Some(high);
         }
     }
-    // Unreachable when `total` matches the counts (invariant);
-    // fall back to the top bucket rather than panic.
+    // Unreachable: `total` is summed from these same counts,
+    // so some bucket reaches `rank ≤ total`; fall back to the
+    // top bucket rather than panic.
     let (_, high) = config.value_range(counts.len() - 1);
     Some(high)
 }
 
 /// Merge `src` counts into `dst` (saturating), configs must
-/// match. Returns the count actually added to `dst`'s total.
+/// match.
 pub(crate) fn merge_into<C: Counter>(
     dst_config: &Config,
     dst_counts: &mut [C],
     src_config: &Config,
     src_counts: &[C],
-) -> Result<u64, Error> {
+) -> Result<(), Error> {
     if dst_config != src_config {
         return Err(Error::ConfigMismatch);
     }
-    let mut added = 0u64;
     for (d, s) in dst_counts.iter_mut().zip(src_counts.iter()) {
-        let n = s.to_u64();
-        *d = d.sat_add(n);
-        added = added.saturating_add(n);
+        *d = d.sat_add(s.to_u64());
     }
-    Ok(added)
+    Ok(())
 }
 
 #[cfg(test)]

@@ -69,9 +69,11 @@ and older `## Done` sections are moved to [done.md](notes/done.md) to keep this 
 
 - feat: no_std h2 histogram core [[2]]
 - chore: rename crate to h2hist [[3]]
+- perf: record path inlining, read-time total [[4]]
 
 # References
 
 [1]: notes/chores/chores-01.md#deferred-buffer-swap-servicing-model
 [2]: notes/chores/chores-01.md#feat-no_std-h2-histogram-core
 [3]: notes/chores/chores-01.md#chore-rename-crate-to-h2hist
+[4]: notes/chores/chores-01.md#perf-record-path-inlining-read-time-total
