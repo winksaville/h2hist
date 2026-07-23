@@ -364,6 +364,53 @@ instead; the walk is off the hot path.
 
 ### As-built ladder
 
+- [[N]] 0.1.3-0 chore: band report cycle setup — version-of-record
+  to 0.1.3-0, the ladder into `## In Progress`, this chores section
+  opened with its design subsections, the ARCHITECTURE.md reversal,
+  and the iiac-perf adoption todo. Cycle runs on branch
+  `refactor-common-modules`.
+- [[N]] 0.1.3-1 refactor: dev module for test, bench, demo — one
+  `dev/` module (consts, rng, stream) behind a single `#[path]`
+  include per consumer, plus the same const-derivation applied to
+  the `src/` unit tests:
+  - `SplitMix64` went from three verbatim copies to one, and the
+    heavy-tailed stream from three spellings to one `HeavyTailed`
+    iterator. The stream's `next()` makes the same PRNG calls in
+    the same order as the copies it replaces, so every consumer's
+    values are unchanged — the demo's output is byte-identical.
+  - The config, seed, and oracle precision — the values more
+    than one consumer reads — are `dev/consts.rs` constants;
+    the stream-shape constants, read only by `dev/stream.rs`,
+    live in that file. `CFG` is a `const Config`, so `BUCKETS`
+    sizes storage at compile time and the printed `g=…  n=…`
+    header is generated from the same powers the histogram is
+    built from rather than restating them.
+  - The `hdrhistogram` side of both the bench and the parity test
+    is now built from `HDR_SIGFIG`, and the parity tolerance is
+    computed from the two precisions (`2^-g + 10^-sigfig`) rather
+    than carrying a hardcoded `0.01`. That pair is the one that
+    must not drift: the oracle is only meaningful if both sides
+    describe the same precision.
+  - `src/` unit tests paired a `Config::new(g, n)` with a
+    hand-computed array length (`[0u32; 28]`, `HistogramArray<80>`).
+    Each test now declares `const CFG` /
+    `const BUCKETS = CFG.total_buckets()` via a `const fn cfg`, so a
+    changed config cannot leave a stale length behind. The
+    deliberately-wrong lengths became `BUCKETS - 1`, keeping them
+    wrong by construction.
+  - Single-character identifiers across the crate were given
+    descriptive names, so a diff or plain-text view carries the
+    meaning an editor's hover would: the `Counter` generic `C` →
+    `Cnt`; counter locals `c`/`d`/`s` → `cnt`/`dst_cnt`/`src_cnt`;
+    the `quantile` fraction `q` → `fraction`; the `record_n` count
+    `n` → `count`; index-math locals and every test/bench/dev
+    binding likewise. Two conventional names are kept — the
+    lifetime `'a` and the const-generic array length (renamed
+    `N` → `LEN`, always `usize`) — where the "find the type"
+    problem does not arise. The `g=`/`n=`/`v=` labels *inside* assert messages stay
+    as the h2 output notation. `examples/h2demo.rs` is left for the
+    report-path rewrite (0.1.3-7).
+
 # References
 
 [1]: https://github.com/winksaville/h2hist/commit/45901cdb0b70 "45901cdb0b70a02f2dd32b03c78ddcb59d25293f"

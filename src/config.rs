@@ -95,15 +95,15 @@ impl Config {
         if value < (1u64 << (self.grouping_power + 1)) {
             return value as usize;
         }
-        let v = if value > self.max_value() {
+        let clamped = if value > self.max_value() {
             self.max_value()
         } else {
             value
         };
-        let power = 63 - v.leading_zeros() as u8;
+        let power = 63 - clamped.leading_zeros() as u8;
         let log_bucket = power - self.grouping_power;
         ((log_bucket as usize) << self.grouping_power)
-            + ((v >> (power - self.grouping_power)) as usize)
+            + ((clamped >> (power - self.grouping_power)) as usize)
     }
 
     /// Inclusive value range `(low, high)` of a bucket index.
@@ -116,8 +116,8 @@ impl Config {
             return (index as u64, index as u64);
         }
         let log_bucket = (index >> self.grouping_power) as u8 - 1;
-        let m = index - ((log_bucket as usize) << self.grouping_power);
-        let low = (m as u64) << log_bucket;
+        let offset = index - ((log_bucket as usize) << self.grouping_power);
+        let low = (offset as u64) << log_bucket;
         (low, low + ((1u64 << log_bucket) - 1))
     }
 }
@@ -150,9 +150,13 @@ mod tests {
             (7, 40, 4352),
             (10, 40, 31744),
         ];
-        for (g, n, buckets) in cases {
-            let c = Config::new(g, n).unwrap();
-            assert_eq!(c.total_buckets(), buckets, "g={g} n={n}");
+        for (grouping_power, max_value_power, buckets) in cases {
+            let config = Config::new(grouping_power, max_value_power).unwrap();
+            assert_eq!(
+                config.total_buckets(),
+                buckets,
+                "g={grouping_power} n={max_value_power}"
+            );
         }
     }
 
@@ -168,30 +172,46 @@ mod tests {
     /// must exactly partition `0..=max_value`.
     #[test]
     fn exhaustive_small_configs() {
-        for g in 0u8..=3 {
-            for n in (g + 1)..=10 {
-                let c = Config::new(g, n).unwrap();
-                let total = c.total_buckets();
+        for grouping_power in 0u8..=3 {
+            for max_value_power in (grouping_power + 1)..=10 {
+                let config = Config::new(grouping_power, max_value_power).unwrap();
+                let total = config.total_buckets();
                 let mut prev_idx = 0usize;
                 let mut next_expected_low = 0u64;
-                for v in 0..=c.max_value() {
-                    let idx = c.index_for(v);
-                    assert!(idx < total, "g={g} n={n} v={v}");
-                    assert!(idx >= prev_idx, "monotone g={g} n={n} v={v}");
-                    let (low, high) = c.value_range(idx);
-                    assert!(low <= v && v <= high, "g={g} n={n} v={v} idx={idx}");
-                    if idx != prev_idx || v == 0 {
+                for value in 0..=config.max_value() {
+                    let idx = config.index_for(value);
+                    assert!(
+                        idx < total,
+                        "g={grouping_power} n={max_value_power} v={value}"
+                    );
+                    assert!(
+                        idx >= prev_idx,
+                        "monotone g={grouping_power} n={max_value_power} v={value}"
+                    );
+                    let (low, high) = config.value_range(idx);
+                    assert!(
+                        low <= value && value <= high,
+                        "g={grouping_power} n={max_value_power} v={value} idx={idx}"
+                    );
+                    if idx != prev_idx || value == 0 {
                         // First value of a bucket: partition check.
-                        assert_eq!(low, next_expected_low, "g={g} n={n} v={v}");
-                        assert_eq!(low, v, "bucket low is its first value");
+                        assert_eq!(
+                            low, next_expected_low,
+                            "g={grouping_power} n={max_value_power} v={value}"
+                        );
+                        assert_eq!(low, value, "bucket low is its first value");
                         next_expected_low = high + 1;
                     }
                     prev_idx = idx;
                 }
-                assert_eq!(prev_idx, total - 1, "top value hits top bucket g={g} n={n}");
+                assert_eq!(
+                    prev_idx,
+                    total - 1,
+                    "top value hits top bucket g={grouping_power} n={max_value_power}"
+                );
                 assert_eq!(
                     next_expected_low,
-                    c.max_value() + 1,
+                    config.max_value() + 1,
                     "partition covers domain"
                 );
             }
@@ -200,27 +220,27 @@ mod tests {
 
     #[test]
     fn over_range_clamps_to_top_bucket() {
-        let c = Config::new(3, 10).unwrap();
-        let top = c.total_buckets() - 1;
-        assert_eq!(c.index_for(c.max_value()), top);
-        assert_eq!(c.index_for(c.max_value() + 1), top);
-        assert_eq!(c.index_for(u64::MAX), top);
+        let config = Config::new(3, 10).unwrap();
+        let top = config.total_buckets() - 1;
+        assert_eq!(config.index_for(config.max_value()), top);
+        assert_eq!(config.index_for(config.max_value() + 1), top);
+        assert_eq!(config.index_for(u64::MAX), top);
     }
 
     #[test]
     fn n64_top_bucket() {
-        let c = Config::new(2, 64).unwrap();
-        assert_eq!(c.index_for(u64::MAX), c.total_buckets() - 1);
-        let (low, high) = c.value_range(c.total_buckets() - 1);
+        let config = Config::new(2, 64).unwrap();
+        assert_eq!(config.index_for(u64::MAX), config.total_buckets() - 1);
+        let (low, high) = config.value_range(config.total_buckets() - 1);
         assert!(low <= high);
         assert_eq!(high, u64::MAX);
     }
 
     #[test]
     fn exact_region_is_exact() {
-        let c = Config::new(4, 20).unwrap();
-        for v in 0..(1u64 << 5) {
-            assert_eq!(c.value_range(c.index_for(v)), (v, v));
+        let config = Config::new(4, 20).unwrap();
+        for value in 0..(1u64 << 5) {
+            assert_eq!(config.value_range(config.index_for(value)), (value, value));
         }
     }
 }

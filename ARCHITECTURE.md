@@ -50,11 +50,11 @@ are separate, and the core histogram type *borrows* its counts.
   derived state (totals are summed at read time, keeping the
   record path minimal). The caller owns the memory: a static
   buffer, a stack array, or (with `std`) a heap slice.
-- `HistogramArray<const N, C>` — owned inline `[C; N]`
+- `HistogramArray<const LEN, Cnt>` — owned inline `[Cnt; LEN]`
   convenience wrapper with a size check against
   `Config::total_buckets()`. Rust's stable const generics
-  can't derive N from (g, n) directly (`generic_const_exprs`
-  is unstable), so N is explicit and checked.
+  can't derive LEN from (g, n) directly (`generic_const_exprs`
+  is unstable), so LEN is explicit and checked.
 - Why borrowing is the default: the future buffer-swap model —
   a background task handing a probe a fresh zeroed slice and
   taking the full one — needs detachable storage. Keeping
@@ -100,19 +100,19 @@ impl Config {
     pub const fn value_range(&self, index: usize) -> (u64, u64);
 }
 
-pub struct Histogram<'a, C: Counter = u32> {
-    // config, counts: &'a mut [C]
+pub struct Histogram<'a, Cnt: Counter = u32> {
+    // config, counts: &'a mut [Cnt]
 }
-impl<C: Counter> Histogram<'_, C> {
+impl<Cnt: Counter> Histogram<'_, Cnt> {
     pub fn record(&mut self, value: u64);
     pub fn record_n(&mut self, value: u64, count: u64);
-    pub fn quantile(&self, q: f64) -> Option<u64>;
+    pub fn quantile(&self, fraction: f64) -> Option<u64>;
     pub fn merge_from(&mut self, other: &Self) -> Result<(), Error>;
     pub fn buckets(&self) -> impl Iterator<Item = Bucket>;
 }
 
-pub struct HistogramArray<const N: usize, C: Counter = u32> {
-    // owned [C; N], checked against Config::total_buckets()
+pub struct HistogramArray<const LEN: usize, Cnt: Counter = u32> {
+    // owned [Cnt; LEN], checked against Config::total_buckets()
 }
 ```
 

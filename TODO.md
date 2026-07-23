@@ -42,7 +42,7 @@ decision — see [[5]].
 - [[N]] 0.1.3-0 chore: band report cycle setup (done)
   - version-of-record, this ladder, chores section, the
     ARCHITECTURE.md reversal, and the iiac-perf adoption todo
-- [[N]] 0.1.3-1 refactor: dev module for test, bench, demo
+- [[N]] 0.1.3-1 refactor: dev module for test, bench, demo (done)
   - `dev/{mod,consts,rng,stream}.rs` behind one `#[path]`
     include per consumer; retires 3 `SplitMix64` copies, 3
     stream copies, and the scattered `(7, 30)` / seed / sigfig

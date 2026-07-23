@@ -9,22 +9,16 @@
 //!   `cumulative` field, except the closing p50/p99/p99.9/max
 //!   line, which uses `quantile()` as intended for spot reads.
 
-use h2hist::{Config, Histogram};
+use h2hist::Histogram;
 
-/// Deterministic 64-bit PRNG (splitmix64); same shape as the
-/// oracle suite in `tests/oracle.rs`.
-struct SplitMix64(u64);
+#[path = "../dev/mod.rs"]
+mod dev;
 
-impl SplitMix64 {
-    /// Next raw u64.
-    fn next(&mut self) -> u64 {
-        self.0 = self.0.wrapping_add(0x9E37_79B9_7F4A_7C15);
-        let mut z = self.0;
-        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
-        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
-        z ^ (z >> 31)
-    }
-}
+use dev::consts::{BUCKETS, CFG, GROUPING_POWER, MAX_VALUE_POWER, SEED};
+use dev::stream::HeavyTailed;
+
+/// Samples the demo records.
+const SAMPLES: usize = 1_000_000;
 
 /// One quantile-fence band's accumulated stats: `first`/`last`
 /// bound the recorded values it covers, `count` is its exact
@@ -122,19 +116,10 @@ fn rank_boundaries(total: u64) -> [u64; FENCES.len()] {
     boundary
 }
 
-/// Record 1,000,000 deterministic synthetic latency-tick samples
-/// (seed 42) into `h`.
+/// Record [`SAMPLES`] deterministic synthetic latency ticks
+/// into `h`.
 fn record_samples(h: &mut Histogram<'_, u32>) {
-    let mut rng = SplitMix64(42);
-    let max_value = h.config().max_value();
-    for _ in 0..1_000_000u64 {
-        let base = 50 + (rng.next() % 100);
-        let v = match rng.next() % 1000 {
-            0 => base * (1 + rng.next() % 10_000),
-            1..=9 => base * (1 + rng.next() % 100),
-            _ => base,
-        }
-        .clamp(1, max_value);
+    for v in HeavyTailed::new(SEED, h.config().max_value()).take(SAMPLES) {
         h.record(v);
     }
 }
@@ -260,15 +245,13 @@ fn print_table(h: &Histogram<'_, u32>) {
 /// Build the histogram, record samples, and print the demo
 /// report.
 fn main() -> Result<(), h2hist::Error> {
-    let cfg = Config::new(7, 30)?;
-    let mut storage = vec![0u32; cfg.total_buckets()];
-    let mut h = Histogram::new(cfg, &mut storage)?;
+    let mut storage = vec![0u32; BUCKETS];
+    let mut h = Histogram::new(CFG, &mut storage)?;
 
     println!("h2demo — h2hist band table");
     println!(
-        "config: g=7 n=30 buckets={} bytes={}",
-        cfg.total_buckets(),
-        cfg.total_buckets() * 4
+        "config: g={GROUPING_POWER} n={MAX_VALUE_POWER} buckets={BUCKETS} bytes={}",
+        BUCKETS * size_of::<u32>()
     );
 
     record_samples(&mut h);
