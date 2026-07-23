@@ -17,6 +17,7 @@ mod bands;
 mod config;
 mod counter;
 mod histogram;
+mod stats;
 
 pub use analysis::{Bucket, Buckets};
 pub use array::HistogramArray;
@@ -24,3 +25,4 @@ pub use bands::{Band, BandAssign, Boundary, Ladder, LadderIter, MidRank, RankSpl
 pub use config::{Config, Error};
 pub use counter::Counter;
 pub use histogram::Histogram;
+pub use stats::Stats;

@@ -436,7 +436,7 @@ instead; the walk is off the hot path.
     cross-multiplication, exact ranks (incl. `u64::MAX`-scale
     totals), and the demo's z4/n8 depths (21 boundaries: its
     19 fences plus min/max).
-- [[N]] 0.1.3-3 feat: band assignment trait — `BandAssign` in
+- [[16]] 0.1.3-3 feat: band assignment trait — `BandAssign` in
   `bands.rs`, distributing a bucket stream into a ladder's
   bands, with both source conventions as impls:
   - `Band` is the accumulator (first/last/count/weighted_sum,
@@ -456,6 +456,24 @@ instead; the walk is off the hot path.
     iiac-perf's `band_index` test, a full histogram pass where
     the two split the run's top differently, and fold
     semantics (bounds, midpoint mass, empty buckets inert).
+- [[N]] 0.1.3-4 feat: midpoint-weighted mean and variance —
+  `src/stats.rs`, the summary-stat module:
+  - `Stats { count, mean, variance }` over a rank window
+    `(lo, hi]` — one primitive covers the overall row
+    (`(0, total]`), the tail-trimmed row (`(0, rank(n2)]`),
+    and a future p10–p90 core window; windows split buckets
+    by exact rank span, pairing with `RankSplit`.
+  - Variance, not stdev, in the structure (`core` has no
+    `sqrt`); `stdev()` under `std`, a `libm` feature stays
+    open.
+  - Two passes (mean, then centered second moment): the
+    demo's one-pass `sumsq/n − mean²` cancels catastrophically
+    at latency scales — the test pins a case (~1e9 mean,
+    spread 1) where the shortcut returns 0, the answer
+    entirely lost below the ulp of the squares.
+  - `from_buckets` / `from_window` take a `Fn() -> Iterator`
+    so the two passes re-create the stream — `|| h.buckets()`
+    for the histogram types, any mapped stream for adopters.
 
 # References
 
@@ -474,3 +492,4 @@ instead; the walk is off the hot path.
 [13]: https://github.com/winksaville/h2hist/commit/ceee76323d71 "ceee76323d71b63dce642bdcb172563425d2f54f"
 [14]: https://github.com/winksaville/h2hist/commit/7e52a22dc7a7 "7e52a22dc7a7e1488c42a90215c2b2cf4b65af8c"
 [15]: https://github.com/winksaville/h2hist/commit/a6f7444a0bf7 "a6f7444a0bf72c547cd9c286c914477fd9680970"
+[16]: https://github.com/winksaville/h2hist/commit/469c841ae7c5 "469c841ae7c5a2708bc092a2e91865e3f76b4fcd"
