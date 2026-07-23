@@ -22,7 +22,60 @@ At close-out the ladder lives on as the cycle's chores
 `### As-built ladder`, where the refs are preserved
 (renumbered to that file's local `# References` slots).
 
-_No cycle currently in progress._
+**feat: no_std band report modules**
+
+The band-table capability lives in the demo, not the crate:
+`FENCES`, `build_bands`, `print_table`, `commas` — ~200 of
+`examples/h2demo.rs`'s 288 lines — while `src/` computes no band,
+mean, or stdev. The same accumulate-then-render loop exists three
+more times in `../iiac-perf` (`harness.rs`, `band_table.rs`,
+`probe.rs`). Separately `SplitMix64`, the heavy-tailed stream, and
+the `(7, 30)` config are copied verbatim across `tests/oracle.rs`,
+`benches/record.rs`, and `examples/h2demo.rs`, so a change to one
+silently diverges from the others.
+
+Everything practical stays `no_std`: the new modules build report
+*structures*; only writing them to stdout is `std`-gated. This
+reverses ARCHITECTURE.md's "band-table reporting stays in tprobe"
+decision — see [[5]].
+
+- [[N]] 0.1.3-0 chore: band report cycle setup (done)
+  - version-of-record, this ladder, chores section, the
+    ARCHITECTURE.md reversal, and the iiac-perf adoption todo
+- [[N]] 0.1.3-1 refactor: dev module for test, bench, demo
+  - `dev/{mod,consts,rng,stream}.rs` behind one `#[path]`
+    include per consumer; retires 3 `SplitMix64` copies, 3
+    stream copies, and the scattered `(7, 30)` / seed / sigfig
+    literals
+  - folds in the `src/` unit-test literals: each
+    `Config::new(g, n)` + hand-computed `[C; N]` pair becomes
+    `const C` + `const N: usize = C.total_buckets()`
+- [[N]] 0.1.3-2 feat: no_std band ladder and labels
+  - `src/bands.rs`: `Boundary`/`BoundaryKind`, const ladder from
+    `Z_DEPTH`/`N_DEPTH`, `BandLabels` with alloc-free label
+    writing; fences as integer rationals, so no `floor`/`powi`
+- [[N]] 0.1.3-3 feat: band assignment trait
+  - `BandAssign` with `RankSplit` (h2demo's exact rank split)
+    and `MidRank` (iiac-perf's right-closed Hazen mid-rank);
+    tests pin a case where the two legitimately disagree
+- [[N]] 0.1.3-4 feat: midpoint-weighted mean and variance
+  - `src/stats.rs`: two-pass variance, avoiding the
+    `sumsq/n - mean²` cancellation the demo has today; `stdev()`
+    where a `sqrt` exists
+- [[N]] 0.1.3-5 feat: band table structure
+  - `src/table.rs`: fixed-capacity `BandTable` built in one pass
+    over `Buckets`
+- [[N]] 0.1.3-6 feat: band table rendering
+  - `src/report.rs`: renders into any `core::fmt::Write` with
+    two-pass width measurement; `std` adds the stdout convenience
+- [[N]] 0.1.3-7 refactor: h2demo on library report path
+  - demo ~288 → ~60 lines, gated on output identical to today's
+    at matching ladder depths
+- [[N]] 0.1.3-8 docs: band report modules
+  - README, ARCHITECTURE, and the switch to the fuller z4..n10
+    ladder as a visible change
+- [[N]] 0.1.3 feat: no_std band report modules
+  - close-out and validation
 
 ## Todo
 
@@ -48,6 +101,15 @@ _No cycle currently in progress._
    `examples/tp_pc`, then adopt in its core recording path.
    The integration cycle runs in tprobe's repo; this entry
    tracks API gaps it surfaces here.
+3. **iiac-perf adoption.** Retire the three copies of the
+   accumulate-then-render loop (`harness.rs::print_report`,
+   `band_table.rs::render`, `probe.rs::report`) onto this
+   crate's band/report modules; `Bucket`'s fields are `pub`,
+   so iiac-perf maps `hdrhistogram::iter_recorded()` into
+   `Bucket`s with no dependency change here. The integration
+   cycle runs in iiac-perf's repo; this entry tracks the API
+   gaps it surfaces — the `adjusted` column extension point
+   first. See [[5]].
 
 ## Ideas
 
@@ -77,3 +139,4 @@ and older `## Done` sections are moved to [done.md](notes/done.md) to keep this 
 [2]: notes/chores/chores-01.md#feat-no_std-h2-histogram-core
 [3]: notes/chores/chores-01.md#chore-rename-crate-to-h2hist
 [4]: notes/chores/chores-01.md#perf-record-path-inlining-read-time-total
+[5]: notes/chores/chores-01.md#feat-no_std-band-report-modules

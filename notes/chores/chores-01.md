@@ -247,7 +247,7 @@ and pushes survive the transition.
 
 ## perf: record path inlining, read-time total
 
-Commits:
+Commits: [[12]]
 
 A bench-driven record-path day (2026-07-22): added the
 iopsystems `histogram` crate to `benches/record` for a
@@ -301,6 +301,69 @@ Lessons from the chase, recorded because they will recur:
   ~0.4 ns/record over the 0.89 base (was ~0.7 over 2.6) —
   standing data for the parked extras decision.
 
+## feat: no_std band report modules
+
+Commits:
+
+The band-table capability shipped inside `examples/h2demo.rs`
+rather than the crate — `FENCES`, `build_bands`, `print_table`,
+`commas`, ~200 of its 288 lines — while `src/` computed no band,
+mean, or stdev. The same accumulate-then-render loop exists three
+more times in `../iiac-perf`, whose own `bands.rs` flags the
+duplication as an open todo. This cycle promotes the capability
+into the crate as `no_std` modules that build report
+*structures*, leaving only stdout writing behind `std`, and
+collapses the dev-side copies (`SplitMix64`, the heavy-tailed
+stream, the `(7, 30)` config) into a shared `dev/` module.
+
+### Reporting moves into the crate
+
+ARCHITECTURE.md's feature map said "Band-table reporting stays
+in tprobe; this crate does not duplicate it." That is reversed
+here, on the condition that made it safe to reverse: the
+reporting modules are `no_std` and no-alloc, so they cost an
+embedded consumer nothing it does not call, and they produce
+*structures* rather than text — a consumer that wants only the
+numbers takes `BandTable` and never touches the renderer.
+
+The original concern was duplication, and the situation turned
+out to be the opposite of what the decision assumed: rather
+than one implementation in tprobe, there are four (h2demo plus
+iiac-perf's three), none shared, all computing the same thing
+from the same bucket shape. Putting one `no_std` implementation
+at the bottom of the stack is what actually removes the
+duplication.
+
+### Constraints from staying no_std
+
+Three `std`-only facilities had to be designed around, all
+without adding a dependency:
+
+- `f64::sqrt` is not in `core`, so `Stats` stores **variance**
+  and `stdev()` is available where a `sqrt` exists (`std`
+  today, a `libm` feature left open). No information is lost —
+  the two differ by a square root — and variance is already
+  monotonic in stdev for comparisons.
+- `f64::floor` / `powi` are not in `core` either, so the fence
+  ladder is integer rationals: a fence is `num/den` and a
+  boundary is `total * num / den` in u128. Exact, and more
+  accurate than the `(fraction * total as f64).floor()` the
+  demo used.
+- Alloc-free rendering measures column widths with a counting
+  writer pass rather than buffering formatted rows, and label
+  text is written into the sink instead of returned as
+  `String`.
+
+### Numeric fix carried along
+
+The demo computed variance as `sumsq/n - mean²`, which loses
+precision by cancellation when the mean is large relative to
+the spread — exactly the latency-histogram case. The shared
+`stats.rs` accumulates `(value - mean)²` in a second pass
+instead; the walk is off the hot path.
+
+### As-built ladder
+
 # References
 
 [1]: https://github.com/winksaville/h2hist/commit/45901cdb0b70 "45901cdb0b70a02f2dd32b03c78ddcb59d25293f"
@@ -314,3 +377,4 @@ Lessons from the chase, recorded because they will recur:
 [9]: https://github.com/winksaville/h2hist/commit/d7ac06b84ad9 "d7ac06b84ad9f06285d0db6459ec2496ef507dd6"
 [10]: https://github.com/winksaville/h2hist/commit/18f2b9f10aee "18f2b9f10aee585b0d7a52180725db799dc1bdc4"
 [11]: https://github.com/winksaville/h2hist/commit/90ba3fe94d73 "90ba3fe94d73ae99b98235be13327dc97b1b76cb"
+[12]: https://github.com/winksaville/h2hist/commit/9a79e0eb1922 "9a79e0eb19225c9caeaf458d251dd574111b99e8"
