@@ -50,11 +50,11 @@ are separate, and the core histogram type *borrows* its counts.
   derived state (totals are summed at read time, keeping the
   record path minimal). The caller owns the memory: a static
   buffer, a stack array, or (with `std`) a heap slice.
-- `HistogramArray<const N, C>` — owned inline `[C; N]`
+- `HistogramArray<const LEN, Cnt>` — owned inline `[Cnt; LEN]`
   convenience wrapper with a size check against
   `Config::total_buckets()`. Rust's stable const generics
-  can't derive N from (g, n) directly (`generic_const_exprs`
-  is unstable), so N is explicit and checked.
+  can't derive LEN from (g, n) directly (`generic_const_exprs`
+  is unstable), so LEN is explicit and checked.
 - Why borrowing is the default: the future buffer-swap model —
   a background task handing a probe a fresh zeroed slice and
   taking the full one — needs detachable storage. Keeping
@@ -76,9 +76,16 @@ are separate, and the core histogram type *borrows* its counts.
 
 - Core: `#![cfg_attr(not(feature = "std"), no_std)]`,
   no dependencies.
-- `std` (default): convenience only — the demo example and
-  any std-needing helpers. Band-table reporting stays in
-  tprobe; this crate does not duplicate it.
+- `std` (default): the render module (`report`) and any
+  std-needing helpers.
+- Band-table reporting **is** in this crate as of 0.1.3,
+  split along the device/service line: the `no_std` modules
+  build report *structures* (`bands`, `stats`, `table`) — the
+  artifacts a device would ship over a wire — and the
+  `std`-gated `report` module renders them as text on the
+  service side. This reverses the founding decision to leave
+  reporting to tprobe — see
+  [Readout requirements](#readout-requirements-band-tables).
 - Dev-dependencies (tests/benches only): iopsystems
   `histogram` and `hdrhistogram` 7 as correctness oracles,
   plus a bench harness.
@@ -94,19 +101,19 @@ impl Config {
     pub const fn value_range(&self, index: usize) -> (u64, u64);
 }
 
-pub struct Histogram<'a, C: Counter = u32> {
-    // config, counts: &'a mut [C]
+pub struct Histogram<'a, Cnt: Counter = u32> {
+    // config, counts: &'a mut [Cnt]
 }
-impl<C: Counter> Histogram<'_, C> {
+impl<Cnt: Counter> Histogram<'_, Cnt> {
     pub fn record(&mut self, value: u64);
     pub fn record_n(&mut self, value: u64, count: u64);
-    pub fn quantile(&self, q: f64) -> Option<u64>;
+    pub fn quantile(&self, fraction: f64) -> Option<u64>;
     pub fn merge_from(&mut self, other: &Self) -> Result<(), Error>;
     pub fn buckets(&self) -> impl Iterator<Item = Bucket>;
 }
 
-pub struct HistogramArray<const N: usize, C: Counter = u32> {
-    // owned [C; N], checked against Config::total_buckets()
+pub struct HistogramArray<const LEN: usize, Cnt: Counter = u32> {
+    // owned [Cnt; LEN], checked against Config::total_buckets()
 }
 ```
 
@@ -161,14 +168,27 @@ shrinks the footprint directly: e.g. a 1 kHz tick watching
   process; double it if a snapshot model later
   double-buffers each probe.
 
-## Validation
-
 ## Readout requirements (band tables)
 
 The consumer-side bar is iiac-perf's band table: z/p/n quantile
 bands, each showing first/last/range/count/mean, plus overall
-and quantile-trimmed mean/stdev. Everything derives from the
-bucket iterator:
+and quantile-trimmed mean/stdev. As of 0.1.3 that bar is met
+*in this crate* rather than left to consumers, because the
+duplication the original decision meant to avoid turned out to
+run the other way: the same accumulate-then-render loop existed
+four times (h2demo plus iiac-perf's `harness.rs`,
+`band_table.rs`, `probe.rs`), none shared. One `no_std`
+implementation at the bottom of the stack is what removes it.
+
+As built (0.1.3): `bands` (Ladder / Boundary, integer-rational
+fences; `BandAssign` with the `RankSplit` and `MidRank`
+conventions, self-named via `name()`), `stats` (rank-window
+count/mean/variance, two-pass), `table` (`BandTable`, sized at
+compile time from a `const Ladder`), and the `std`-gated
+`report` / `numfmt` render modules. The trim anchor is the n2
+fence. The demo is the integration proof.
+
+Everything derives from the bucket iterator:
 
 - first/last/range/count — band's first/last non-empty bucket
   bounds and summed counts; bands are quantile fences, so the
@@ -176,6 +196,14 @@ bucket iterator:
 - mean/stdev (overall, per-band, trimmed) — bucket-midpoint
   weighted, accurate to rel. err; original HdrHistogram
   computes them the same way.
+  - `core` has no `sqrt`, so the structure carries
+    **variance** and `stdev()` is offered where a `sqrt`
+    exists (`std` today; a `libm` feature stays open). The
+    two differ by a square root, so nothing is lost.
+  - Variance is accumulated two-pass as `(value - mean)²`,
+    not as `sumsq/n - mean²` — the latter cancels badly when
+    the mean is large relative to the spread, which is the
+    latency case. Both passes are off the hot path.
 - exact overall mean would need a running `sum` at record
   time (one u64 add) — a hot-path candidate decided by bench
   at 0.1.0-8, alongside exact min/max.

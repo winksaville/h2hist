@@ -15,7 +15,7 @@ pub trait Counter: Copy + Default {
     fn to_u64(self) -> u64;
 
     /// Narrow from u64, saturating at this type's MAX.
-    fn from_u64_sat(v: u64) -> Self;
+    fn from_u64_sat(value: u64) -> Self;
 
     /// Saturating add of a u64 delta.
     #[inline]
@@ -26,19 +26,19 @@ pub trait Counter: Copy + Default {
 
 /// Implement `Counter` for an unsigned primitive.
 macro_rules! impl_counter {
-    ($($t:ty),*) => {$(
-        impl Counter for $t {
+    ($($ty:ty),*) => {$(
+        impl Counter for $ty {
             #[inline]
             fn to_u64(self) -> u64 {
                 self as u64
             }
 
             #[inline]
-            fn from_u64_sat(v: u64) -> Self {
-                if v > <$t>::MAX as u64 {
-                    <$t>::MAX
+            fn from_u64_sat(value: u64) -> Self {
+                if value > <$ty>::MAX as u64 {
+                    <$ty>::MAX
                 } else {
-                    v as $t
+                    value as $ty
                 }
             }
         }

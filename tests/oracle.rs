@@ -13,46 +13,60 @@
 
 use h2hist::{Config, Histogram};
 
-/// Deterministic 64-bit PRNG (splitmix64).
-struct SplitMix64(u64);
+#[path = "../dev/mod.rs"]
+mod dev;
 
-impl SplitMix64 {
-    /// Next raw u64.
-    fn next(&mut self) -> u64 {
-        self.0 = self.0.wrapping_add(0x9E37_79B9_7F4A_7C15);
-        let mut z = self.0;
-        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
-        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
-        z ^ (z >> 31)
-    }
-}
+use dev::consts::{BUCKETS, CFG, GROUPING_POWER, HDR_SIGFIG, MAX_VALUE_POWER, SEED};
+use dev::rng::SplitMix64;
+use dev::stream::HeavyTailed;
+
+/// Configs swept for exact counts parity: a tiny one, a
+/// mid-size one, the shared dev config, and a wide one.
+const PARITY_CONFIGS: [(u8, u8); 4] =
+    [(2, 10), (4, 20), (GROUPING_POWER, MAX_VALUE_POWER), (7, 40)];
+
+/// Seed for the counts-parity sweep, kept distinct from
+/// [`SEED`] so the sweep and the quantile test exercise
+/// different streams; per-config bits are mixed in below.
+const PARITY_SEED: u64 = 0xDEAD_BEEF;
+
+/// Samples per config in the counts-parity sweep.
+const PARITY_SAMPLES: usize = 50_000;
+
+/// Samples in the quantile-parity stream.
+const QUANTILE_SAMPLES: usize = 200_000;
 
 /// Exact counts parity with the h2 oracle across configs and
 /// a uniform-random stream (over-max values excluded — the
 /// oracle rejects them while we clamp).
 #[test]
 fn h2_counts_parity_uniform() {
-    for (g, n) in [(2u8, 10u8), (4, 20), (7, 30), (7, 40)] {
-        let cfg = Config::new(g, n).unwrap();
-        let mut ours_storage = vec![0u64; cfg.total_buckets()];
-        let mut ours = Histogram::new(cfg, &mut ours_storage).unwrap();
-        let mut oracle = histogram::Histogram::new(g, n).unwrap();
+    for (grouping_power, max_value_power) in PARITY_CONFIGS {
+        let config = Config::new(grouping_power, max_value_power).unwrap();
+        let mut ours_storage = vec![0u64; config.total_buckets()];
+        let mut ours = Histogram::new(config, &mut ours_storage).unwrap();
+        let mut oracle = histogram::Histogram::new(grouping_power, max_value_power).unwrap();
 
-        let mut rng = SplitMix64(0xDEAD_BEEF ^ ((g as u64) << 8) ^ n as u64);
-        for _ in 0..50_000 {
-            let v = rng.next() & cfg.max_value();
-            ours.record(v);
-            oracle.increment(v).unwrap();
+        let mut rng =
+            SplitMix64(PARITY_SEED ^ ((grouping_power as u64) << 8) ^ max_value_power as u64);
+        for _ in 0..PARITY_SAMPLES {
+            let value = rng.next() & config.max_value();
+            ours.record(value);
+            oracle.increment(value).unwrap();
         }
 
         let oracle_counts = oracle.as_slice();
         assert_eq!(
-            cfg.total_buckets(),
+            config.total_buckets(),
             oracle_counts.len(),
-            "bucket count differs from oracle g={g} n={n}"
+            "bucket count differs from oracle g={grouping_power} n={max_value_power}"
         );
-        for (i, &oc) in oracle_counts.iter().enumerate() {
-            assert_eq!(ours.count_at(i), Some(oc), "bucket {i} differs g={g} n={n}");
+        for (index, &oracle_count) in oracle_counts.iter().enumerate() {
+            assert_eq!(
+                ours.count_at(index),
+                Some(oracle_count),
+                "bucket {index} differs g={grouping_power} n={max_value_power}"
+            );
         }
     }
 }
@@ -61,29 +75,29 @@ fn h2_counts_parity_uniform() {
 /// buckets as the h2 oracle.
 #[test]
 fn h2_counts_parity_boundaries() {
-    let (g, n) = (5u8, 24u8);
-    let cfg = Config::new(g, n).unwrap();
-    let mut ours_storage = vec![0u64; cfg.total_buckets()];
-    let mut ours = Histogram::new(cfg, &mut ours_storage).unwrap();
-    let mut oracle = histogram::Histogram::new(g, n).unwrap();
+    let (grouping_power, max_value_power) = (5u8, 24u8);
+    let config = Config::new(grouping_power, max_value_power).unwrap();
+    let mut ours_storage = vec![0u64; config.total_buckets()];
+    let mut ours = Histogram::new(config, &mut ours_storage).unwrap();
+    let mut oracle = histogram::Histogram::new(grouping_power, max_value_power).unwrap();
 
-    let mut push = |v: u64| {
-        ours.record(v);
-        oracle.increment(v).unwrap();
+    let mut push = |value: u64| {
+        ours.record(value);
+        oracle.increment(value).unwrap();
     };
     push(0);
-    push(cfg.max_value());
-    for k in 0..n as u32 {
-        let p = 1u64 << k;
-        push(p);
-        push(p - 1);
-        if p < cfg.max_value() {
-            push(p + 1);
+    push(config.max_value());
+    for exp in 0..max_value_power as u32 {
+        let power_of_two = 1u64 << exp;
+        push(power_of_two);
+        push(power_of_two - 1);
+        if power_of_two < config.max_value() {
+            push(power_of_two + 1);
         }
     }
 
-    for (i, &oc) in oracle.as_slice().iter().enumerate() {
-        assert_eq!(ours.count_at(i), Some(oc), "bucket {i}");
+    for (index, &oracle_count) in oracle.as_slice().iter().enumerate() {
+        assert_eq!(ours.count_at(index), Some(oracle_count), "bucket {index}");
     }
 }
 
@@ -93,36 +107,26 @@ fn h2_counts_parity_boundaries() {
 /// theirs), plus 1 for integer slack.
 #[test]
 fn hdr_quantile_parity() {
-    let (g, n) = (7u8, 30u8);
-    let cfg = Config::new(g, n).unwrap();
-    let mut ours_storage = vec![0u32; cfg.total_buckets()];
-    let mut ours = Histogram::new(cfg, &mut ours_storage).unwrap();
-    let mut hdr = hdrhistogram::Histogram::<u64>::new_with_bounds(1, cfg.max_value(), 2).unwrap();
+    let mut ours_storage = [0u32; BUCKETS];
+    let mut ours = Histogram::new(CFG, &mut ours_storage).unwrap();
+    let mut hdr =
+        hdrhistogram::Histogram::<u64>::new_with_bounds(1, CFG.max_value(), HDR_SIGFIG).unwrap();
 
-    // Heavy-tailed synthetic latency: ~100-tick body with a
-    // 1-in-1000 tail stretching multiplicatively.
-    let mut rng = SplitMix64(42);
-    for _ in 0..200_000 {
-        let base = 50 + (rng.next() % 100);
-        let v = match rng.next() % 1000 {
-            0 => base * (1 + rng.next() % 10_000),
-            1..=9 => base * (1 + rng.next() % 100),
-            _ => base,
-        }
-        .clamp(1, cfg.max_value());
-        ours.record(v);
-        hdr.record(v).unwrap();
+    for value in HeavyTailed::new(SEED, CFG.max_value()).take(QUANTILE_SAMPLES) {
+        ours.record(value);
+        hdr.record(value).unwrap();
     }
 
     assert_eq!(ours.total(), hdr.len());
-    let tol = 2f64.powi(-(g as i32)) + 0.01;
-    for q in [0.0, 0.25, 0.5, 0.9, 0.99, 0.999, 0.9999, 0.999_999, 1.0] {
-        let a = ours.quantile(q).unwrap() as f64;
-        let b = hdr.value_at_quantile(q) as f64;
-        let rel = (a - b).abs() / a.max(b).max(1.0);
+    // Our quantization bound (2^-g) plus theirs (10^-sigfig).
+    let tol = 2f64.powi(-(GROUPING_POWER as i32)) + 10f64.powi(-(HDR_SIGFIG as i32));
+    for fraction in [0.0, 0.25, 0.5, 0.9, 0.99, 0.999, 0.9999, 0.999_999, 1.0] {
+        let ours_val = ours.quantile(fraction).unwrap() as f64;
+        let hdr_val = hdr.value_at_quantile(fraction) as f64;
+        let rel = (ours_val - hdr_val).abs() / ours_val.max(hdr_val).max(1.0);
         assert!(
-            rel <= tol + 1.0 / a.max(b).max(1.0),
-            "q={q}: ours={a} hdr={b} rel={rel:.4} tol={tol:.4}"
+            rel <= tol + 1.0 / ours_val.max(hdr_val).max(1.0),
+            "q={fraction}: ours={ours_val} hdr={hdr_val} rel={rel:.4} tol={tol:.4}"
         );
     }
 }

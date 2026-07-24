@@ -4,21 +4,39 @@
 //!   relative error ≤ 2⁻ᵍ, max value 2ⁿ−1, O(1) integer-only
 //!   record path (clz + shift + saturating increment).
 //! - The core borrows caller-supplied counts storage; analysis
-//!   (quantiles, merge, iteration) stays off the hot path.
-//! - `std` feature (default) is convenience-only; the core is
-//!   `no_std`. See `ARCHITECTURE.md` for design and size
-//!   tradeoffs.
+//!   (quantiles, merge, iteration) and the band report
+//!   structures stay off the hot path and `no_std`.
+//! - `std` feature (default) adds the render modules
+//!   (`report`, `numfmt`) — the device/service split: devices
+//!   ship structures, services render text. See
+//!   `ARCHITECTURE.md` for design and size tradeoffs.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
 mod analysis;
 mod array;
+mod bands;
 mod config;
 mod counter;
 mod histogram;
+#[cfg(feature = "std")]
+mod numfmt;
+#[cfg(feature = "std")]
+mod report;
+mod stats;
+mod table;
 
 pub use analysis::{Bucket, Buckets};
 pub use array::HistogramArray;
+pub use bands::{Band, BandAssign, Boundary, Ladder, LadderIter, MidRank, RankSplit};
 pub use config::{Config, Error};
 pub use counter::Counter;
 pub use histogram::Histogram;
+#[cfg(feature = "std")]
+pub use numfmt::{fmt_commas, fmt_commas_f64};
+#[cfg(feature = "std")]
+pub use report::{
+    BandLabels, Layout, boundary_label, frac_label, render_band_table, trim_name, zpn_label,
+};
+pub use stats::Stats;
+pub use table::BandTable;

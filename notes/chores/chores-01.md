@@ -247,7 +247,7 @@ and pushes survive the transition.
 
 ## perf: record path inlining, read-time total
 
-Commits:
+Commits: [[12]]
 
 A bench-driven record-path day (2026-07-22): added the
 iopsystems `histogram` crate to `benches/record` for a
@@ -301,6 +301,286 @@ Lessons from the chase, recorded because they will recur:
   ~0.4 ns/record over the 0.89 base (was ~0.7 over 2.6) —
   standing data for the parked extras decision.
 
+## feat: no_std band report modules
+
+Commits:
+
+The band-table capability shipped inside `examples/h2demo.rs`
+rather than the crate — `FENCES`, `build_bands`, `print_table`,
+`commas`, ~200 of its 288 lines — while `src/` computed no band,
+mean, or stdev. The same accumulate-then-render loop exists three
+more times in `../iiac-perf`, whose own `bands.rs` flags the
+duplication as an open todo. This cycle promotes the capability
+into the crate as `no_std` modules that build report
+*structures*, leaving only stdout writing behind `std`, and
+collapses the dev-side copies (`SplitMix64`, the heavy-tailed
+stream, the `(7, 30)` config) into a shared `dev/` module.
+
+### Reporting moves into the crate
+
+ARCHITECTURE.md's feature map said "Band-table reporting stays
+in tprobe; this crate does not duplicate it." That is reversed
+here, on the condition that made it safe to reverse: the
+reporting modules are `no_std` and no-alloc, so they cost an
+embedded consumer nothing it does not call, and they produce
+*structures* rather than text — a consumer that wants only the
+numbers takes `BandTable` and never touches the renderer.
+
+The original concern was duplication, and the situation turned
+out to be the opposite of what the decision assumed: rather
+than one implementation in tprobe, there are four (h2demo plus
+iiac-perf's three), none shared, all computing the same thing
+from the same bucket shape. Putting one `no_std` implementation
+at the bottom of the stack is what actually removes the
+duplication.
+
+### Constraints from staying no_std
+
+Three `std`-only facilities had to be designed around, all
+without adding a dependency:
+
+- `f64::sqrt` is not in `core`, so `Stats` stores **variance**
+  and `stdev()` is available where a `sqrt` exists (`std`
+  today, a `libm` feature left open). No information is lost —
+  the two differ by a square root — and variance is already
+  monotonic in stdev for comparisons.
+- `f64::floor` / `powi` are not in `core` either, so the fence
+  ladder is integer rationals: a fence is `num/den` and a
+  boundary is `total * num / den` in u128. Exact, and more
+  accurate than the `(fraction * total as f64).floor()` the
+  demo used.
+- Rendering was originally planned `no_std`-capable too
+  (counting-writer width passes, sink-written labels); that
+  was rejected at `-6` once written — see the `-6` As-built
+  rung. The render module is `std`-gated instead.
+
+### Numeric fix carried along
+
+The demo computed variance as `sumsq/n - mean²`, which loses
+precision by cancellation when the mean is large relative to
+the spread — exactly the latency-histogram case. The shared
+`stats.rs` accumulates `(value - mean)²` in a second pass
+instead; the walk is off the hot path.
+
+### As-built ladder
+
+- [[13]] 0.1.3-0 chore: band report cycle setup — version-of-record
+  to 0.1.3-0, the ladder into `## In Progress`, this chores section
+  opened with its design subsections, the ARCHITECTURE.md reversal,
+  and the iiac-perf adoption todo. Cycle runs on branch
+  `refactor-common-modules`.
+- [[14]] 0.1.3-1 refactor: dev module for test, bench, demo — one
+  `dev/` module (consts, rng, stream) behind a single `#[path]`
+  include per consumer, plus the same const-derivation applied to
+  the `src/` unit tests:
+  - `SplitMix64` went from three verbatim copies to one, and the
+    heavy-tailed stream from three spellings to one `HeavyTailed`
+    iterator. The stream's `next()` makes the same PRNG calls in
+    the same order as the copies it replaces, so every consumer's
+    values are unchanged — the demo's output is byte-identical.
+  - The config, seed, and oracle precision — the values more
+    than one consumer reads — are `dev/consts.rs` constants;
+    the stream-shape constants, read only by `dev/stream.rs`,
+    live in that file. `CFG` is a `const Config`, so `BUCKETS`
+    sizes storage at compile time and the printed `g=…  n=…`
+    header is generated from the same powers the histogram is
+    built from rather than restating them.
+  - The `hdrhistogram` side of both the bench and the parity test
+    is now built from `HDR_SIGFIG`, and the parity tolerance is
+    computed from the two precisions (`2^-g + 10^-sigfig`) rather
+    than carrying a hardcoded `0.01`. That pair is the one that
+    must not drift: the oracle is only meaningful if both sides
+    describe the same precision.
+  - `src/` unit tests paired a `Config::new(g, n)` with a
+    hand-computed array length (`[0u32; 28]`, `HistogramArray<80>`).
+    Each test now declares `const CFG` /
+    `const BUCKETS = CFG.total_buckets()` via a `const fn cfg`, so a
+    changed config cannot leave a stale length behind. The
+    deliberately-wrong lengths became `BUCKETS - 1`, keeping them
+    wrong by construction.
+  - Single-character identifiers across the crate were given
+    descriptive names, so a diff or plain-text view carries the
+    meaning an editor's hover would: the `Counter` generic `C` →
+    `Cnt`; counter locals `c`/`d`/`s` → `cnt`/`dst_cnt`/`src_cnt`;
+    the `quantile` fraction `q` → `fraction`; the `record_n` count
+    `n` → `count`; index-math locals and every test/bench/dev
+    binding likewise. Two conventional names are kept — the
+    lifetime `'a` and the const-generic array length (renamed
+    `N` → `LEN`, always `usize`) — where the "find the type"
+    problem does not arise. The `g=`/`n=`/`v=` labels *inside* assert messages stay
+    as the h2 output notation. `examples/h2demo.rs` is left for the
+    report-path rewrite (0.1.3-7).
+- [[15]] 0.1.3-2 feat: no_std band ladder — `src/bands.rs`, the
+  first report module, ported from iiac-perf's `bands.rs` and
+  reshaped as pure data and math (`no_std`, no-alloc):
+  - One `Boundary` enum (`Min`/`Z(k)`/`P(d)`/`N(k)`/`Max`)
+    instead of the planned `Boundary` + `BoundaryKind` pair —
+    the kind derives everything (fraction, rank), so a wrapper
+    struct had nothing left to hold.
+  - Fences are integer rationals: `fraction()` returns
+    `(num, den)` and `rank(total)` is `total * num / den` in
+    u128 — exact where iiac-perf's `(pct * total).floor()` is
+    approximate, and no `floor`/`powi` from `std`.
+  - No text: label rendering was drafted here, then pulled —
+    a boundary is device-side data (the wire artifact of the
+    ship-structs-to-a-service model); rendering it is the
+    render module's job. `BandLabels` and the `write_*`
+    methods land at `-6`, parked meanwhile in
+    `tmp/bands-with-labels-parked-for-0.1.3-6.rs` (a new
+    git-ignored `tmp/`).
+  - `Ladder` generates boundaries on demand from `(z_depth,
+    n_depth)` — no stored table; depths validated to `2..=19`
+    (new `Error::BandDepth`), `pow10` saturates as a backstop.
+  - Tests pin the z4/n10 ladder to iiac-perf's documented
+    boundary sequence, rational monotonicity by
+    cross-multiplication, exact ranks (incl. `u64::MAX`-scale
+    totals), and the demo's z4/n8 depths (21 boundaries: its
+    19 fences plus min/max).
+- [[16]] 0.1.3-3 feat: band assignment trait — `BandAssign` in
+  `bands.rs`, distributing a bucket stream into a ladder's
+  bands, with both source conventions as impls:
+  - `Band` is the accumulator (first/last/count/weighted_sum,
+    midpoint mass) — band `i` spans `(boundary i, boundary
+    i+1]`, labeled by the upper fence, matching both sources.
+  - `RankSplit` (the demo's convention): a bucket's rank span
+    splits across every fence it crosses — band counts are
+    exact rank spans; keeps walk state, fresh value per pass.
+  - `MidRank` (iiac-perf's): whole bucket to the band holding
+    its Hazen mid-rank, right-closed. The compare is integer
+    (u128 cross-multiply against the fence rational) — exact
+    where iiac-perf's f64 `pct` compare has ulp slack;
+    saturating backstop far beyond practical totals.
+  - Tests pin a legitimate disagreement (one bucket spanning
+    the whole run: RankSplit spreads per-fence, MidRank drops
+    all in p50), right-closed fence cases mirroring
+    iiac-perf's `band_index` test, a full histogram pass where
+    the two split the run's top differently, and fold
+    semantics (bounds, midpoint mass, empty buckets inert).
+- [[17]] 0.1.3-4 feat: midpoint-weighted mean and variance —
+  `src/stats.rs`, the summary-stat module:
+  - `Stats { count, mean, variance }` over a rank window
+    `(lo, hi]` — one primitive covers the overall row
+    (`(0, total]`), the tail-trimmed row (`(0, rank(n2)]`),
+    and a future p10–p90 core window; windows split buckets
+    by exact rank span, pairing with `RankSplit`.
+  - Variance, not stdev, in the structure (`core` has no
+    `sqrt`); `stdev()` under `std`, a `libm` feature stays
+    open.
+  - Two passes (mean, then centered second moment): the
+    demo's one-pass `sumsq/n − mean²` cancels catastrophically
+    at latency scales — the test pins a case (~1e9 mean,
+    spread 1) where the shortcut returns 0, the answer
+    entirely lost below the ulp of the squares.
+  - `from_buckets` / `from_window` take a `Fn() -> Iterator`
+    so the two passes re-create the stream — `|| h.buckets()`
+    for the histogram types, any mapped stream for adopters.
+- [[18]] 0.1.3-5 feat: band table structure — `src/table.rs`,
+  the assembled ship-structs-to-a-service artifact:
+  - `BandTable<CAP>`: bands + overall + trimmed `Stats` +
+    the populated trim extent, all numbers; rendering waits
+    for `-6`.
+  - `CAP` is a const generic sized by the new
+    `Ladder::band_count()` (const), so a `const Ladder` sizes
+    its table at compile time — same pattern as
+    `Config::total_buckets()` sizing counts storage.
+  - `build` is generic over `BandAssign`, so either
+    convention assembles the same structure; several cheap
+    passes over a re-creatable stream (total, assignment,
+    two-pass stats) rather than one heavier fused pass.
+  - Trim anchor is the n2 fence: trimmed stats over
+    `(0, rank(n2)]`, `trim_range()` naming the populated
+    extent below the cut by upper boundary (`Error` grows
+    `TableCapacity`).
+  - Tests: table equals manual assignment + Stats windows,
+    trim extent naming, MidRank total conservation, capacity
+    rejection, zeroed empty table.
+- [[19]] 0.1.3-6 feat: std band table rendering — `src/report.rs`,
+  the render side of the device/service split, **`std`-only**:
+  - A `no_std`-capable renderer was fully drafted first
+    (counting-writer width passes, double-write cells,
+    hand-rolled scaled-u128 f64 formatting, a Newton `sqrt`
+    fallback) and rejected on review: devices ship structs
+    and services render, so the ~200 lines of machinery
+    served nobody. Gating the module on `std` states the
+    architecture at the crate boundary and the code drops to
+    plain `String` / `format!` — the shape iiac-perf's
+    `print_report` already has.
+  - Boundary labels land here as free functions (the `-2`
+    parked code, adapted): a label is presentation, so it
+    lives with the renderer, not on the data types. String
+    pins vs iiac-perf's documented label lists restored.
+  - `render_band_table` returns a `String`: header, one row
+    per populated band (first/last/range/count/mean), blank
+    line, overall and trimmed mean/stdev rows — the demo's
+    shape, proven by a snapshot test that renders a
+    fully-predictable table and compares byte-for-byte
+    against the demo's own format strings
+    (`Layout::DEMO_LEGACY`).
+  - `Layout` carries the column widths: `measure()` for snug
+    columns, `DEMO_LEGACY` for the demo's historical fixed
+    shape — both feed the same renderer, keeping the `-7`
+    byte-identical gate and the iiac-perf measured style on
+    one code path.
+  - `fmt_commas` / `fmt_commas_f64` are iiac-perf's shapes
+    (format! + regrouping), in their own `numfmt` module —
+    presentation plumbing, not histogram logic, and a
+    candidate for promotion to a separate crate later.
+    Noted: format!'s rounding follows
+    the true stored double (0.95 stores below the tie and
+    prints `0.9` at one decimal) where the demo's
+    `(x*10).round()/10` can differ through an intermediate;
+    we think no real mean lands on such a tie, and the `-7`
+    gate would catch one.
+  - `Both` in two-cell form prints zpn and fraction as
+    separate columns (the demo's `{:<4} {:<13}` shape);
+    min/max rows leave the fraction cell empty.
+- [[20]] 0.1.3-7 refactor: h2demo on library report path — the
+  cycle's integration proof: the demo drops from 288 to 78
+  lines and every table number comes from the library modules.
+  - Gate result: 23 of 24 output lines byte-identical, all
+    summary rows included. The one divergence was ruled
+    correct and accepted: at 1M samples the old demo's
+    n6/n7/n8 fences collapse to one rank and its
+    "extend the last spanning fence" patch silently slid the
+    top sample into n6, inflating that row's last/range/mean;
+    the ladder's honest max fence gives n6 its true 9 ranks
+    and the top sample its own `max` row. Reproducing the
+    quirk would have needed band-merging machinery to
+    preserve a misstatement.
+  - What remains in the demo: recording, the header lines,
+    and the p50/p99 spot reads — the intended consumer shape
+    (build table, render, print).
+  - `BandAssign` gains `name()` and the demo's title line
+    names the convention in use. Reviewing the two
+    conventions' outputs side by side showed the tables are
+    otherwise indistinguishable in shape, and the names
+    (`RankSplit`, `MidRank`) are this crate's coinages —
+    mid-rank/Hazen has standard-statistics grounding,
+    RankSplit does not — so a report must say which
+    convention produced it.
+  - Tooling note: this workspace now runs on `vc-x1-dev`
+    (0.75.x, the in-refactor branch) — the `.vc-config.toml`
+    schema migrated at `-6` is ahead of stable 0.71, so dev
+    is the binary that accepts this repo.
+- [[21]] 0.1.3-8 docs: band report modules — the docs pass:
+  - README gains a "Band report modules" section (module map,
+    the two conventions and their tradeoff, the device/service
+    split); status and demo sections synced; the goals bullet
+    reads "`no_std` core, `std` rendering".
+  - ARCHITECTURE's Readout requirements gains the as-built
+    module summary; lib.rs's crate doc states the split.
+  - Demo ladder deepened to z4/n10, matching iiac-perf's
+    documented depths. Contrary to the plan's "visible
+    change" expectation, output is unchanged: at 1M samples
+    the n7..n10 bands hold no ranks and empty bands are
+    skipped — the deeper ladder is capacity for longer runs,
+    not new rows.
+- [[N]] 0.1.3 feat: no_std band report modules — close-out:
+  version-of-record to 0.1.3, `## Done` entry, this ladder
+  finalized, the pre-0.1.3 `## Done` entries retired to
+  done.md, TODO references repacked to [1]/[2]. Full cargo
+  cycle plus no_std check green at close-out.
+
 # References
 
 [1]: https://github.com/winksaville/h2hist/commit/45901cdb0b70 "45901cdb0b70a02f2dd32b03c78ddcb59d25293f"
@@ -314,3 +594,13 @@ Lessons from the chase, recorded because they will recur:
 [9]: https://github.com/winksaville/h2hist/commit/d7ac06b84ad9 "d7ac06b84ad9f06285d0db6459ec2496ef507dd6"
 [10]: https://github.com/winksaville/h2hist/commit/18f2b9f10aee "18f2b9f10aee585b0d7a52180725db799dc1bdc4"
 [11]: https://github.com/winksaville/h2hist/commit/90ba3fe94d73 "90ba3fe94d73ae99b98235be13327dc97b1b76cb"
+[12]: https://github.com/winksaville/h2hist/commit/9a79e0eb1922 "9a79e0eb19225c9caeaf458d251dd574111b99e8"
+[13]: https://github.com/winksaville/h2hist/commit/ceee76323d71 "ceee76323d71b63dce642bdcb172563425d2f54f"
+[14]: https://github.com/winksaville/h2hist/commit/7e52a22dc7a7 "7e52a22dc7a7e1488c42a90215c2b2cf4b65af8c"
+[15]: https://github.com/winksaville/h2hist/commit/a6f7444a0bf7 "a6f7444a0bf72c547cd9c286c914477fd9680970"
+[16]: https://github.com/winksaville/h2hist/commit/469c841ae7c5 "469c841ae7c5a2708bc092a2e91865e3f76b4fcd"
+[17]: https://github.com/winksaville/h2hist/commit/123a32ccdd26 "123a32ccdd265d2954ab0f28baebaec9b2ff81c2"
+[18]: https://github.com/winksaville/h2hist/commit/20c59cdd5db8 "20c59cdd5db8f35f36e782deb0340346a37f4b5f"
+[19]: https://github.com/winksaville/h2hist/commit/5a08fb046101 "5a08fb04610119474d7f9a47ee9e3739f4b8e03c"
+[20]: https://github.com/winksaville/h2hist/commit/c338302cdb88 "c338302cdb88cef1084af13fb6ada7784968b96b"
+[21]: https://github.com/winksaville/h2hist/commit/1bf3e3007e5a "1bf3e3007e5ab092742be2c5798d3d85c2ce789d"

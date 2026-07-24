@@ -48,6 +48,15 @@ _No cycle currently in progress._
    `examples/tp_pc`, then adopt in its core recording path.
    The integration cycle runs in tprobe's repo; this entry
    tracks API gaps it surfaces here.
+3. **iiac-perf adoption.** Retire the three copies of the
+   accumulate-then-render loop (`harness.rs::print_report`,
+   `band_table.rs::render`, `probe.rs::report`) onto this
+   crate's band/report modules; `Bucket`'s fields are `pub`,
+   so iiac-perf maps `hdrhistogram::iter_recorded()` into
+   `Bucket`s with no dependency change here. The integration
+   cycle runs in iiac-perf's repo; this entry tracks the API
+   gaps it surfaces — the `adjusted` column extension point
+   first. See [[2]].
 
 ## Ideas
 
@@ -57,6 +66,10 @@ _No cycle currently in progress._
 - HdrHistogram V2 wire/log format compatibility (zigzag
   LEB128 is `no_std`-fine; compression needs a dep).
 - `alloc` feature: Vec-backed storage, auto-resize.
+- Terminal histogram / bar-chart renderer over
+  `Buckets`/`BandTable` (a graph, not a table); count-axis
+  scaling (log or max-normalized) and a CDF percentile-plot
+  variant TBD.
 
 ## Bugs
 
@@ -67,13 +80,9 @@ See [bugs.md](notes/bugs.md).
 Completed tasks are moved from `## Todo` to here, `## Done`, as they are completed
 and older `## Done` sections are moved to [done.md](notes/done.md) to keep this file small.
 
-- feat: no_std h2 histogram core [[2]]
-- chore: rename crate to h2hist [[3]]
-- perf: record path inlining, read-time total [[4]]
+- feat: no_std band report modules [[2]]
 
 # References
 
 [1]: notes/chores/chores-01.md#deferred-buffer-swap-servicing-model
-[2]: notes/chores/chores-01.md#feat-no_std-h2-histogram-core
-[3]: notes/chores/chores-01.md#chore-rename-crate-to-h2hist
-[4]: notes/chores/chores-01.md#perf-record-path-inlining-read-time-total
+[2]: notes/chores/chores-01.md#feat-no_std-band-report-modules
