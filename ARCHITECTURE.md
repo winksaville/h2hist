@@ -180,6 +180,14 @@ four times (h2demo plus iiac-perf's `harness.rs`,
 `band_table.rs`, `probe.rs`), none shared. One `no_std`
 implementation at the bottom of the stack is what removes it.
 
+As built (0.1.3): `bands` (Ladder / Boundary, integer-rational
+fences; `BandAssign` with the `RankSplit` and `MidRank`
+conventions, self-named via `name()`), `stats` (rank-window
+count/mean/variance, two-pass), `table` (`BandTable`, sized at
+compile time from a `const Ladder`), and the `std`-gated
+`report` / `numfmt` render modules. The trim anchor is the n2
+fence. The demo is the integration proof.
+
 Everything derives from the bucket iterator:
 
 - first/last/range/count — band's first/last non-empty bucket

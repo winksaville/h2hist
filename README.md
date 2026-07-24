@@ -10,9 +10,11 @@ usable; see
 [Relation to iopsystems' histogram](#relation-to-iopsystems-histogram)
 for how it differs from their crate.
 
-Status: 0.1.2 (see [TODO.md](TODO.md)); core, analysis,
+Status: 0.1.3 (see [TODO.md](TODO.md)); core, analysis,
 oracle tests, demo, no_std check, and the comparison bench
-have landed; record path tuned (see [Bench](#bench)).
+have landed; record path tuned (see [Bench](#bench)); band
+report modules landed (see
+[Band report modules](#band-report-modules)).
 
 ## Build and test
 
@@ -28,11 +30,41 @@ have landed; record path tuned (see [Bench](#bench)).
 `examples/h2demo.rs` records 1M synthetic latency ticks and
 prints an iiac-perf-style band table (z/p/n quantile bands
 with first/last/range/count/mean, overall and tail-trimmed
-mean/stdev):
+mean/stdev), built entirely on the library's band report
+modules — assemble a `BandTable` over the z4/n10 ladder with
+the `RankSplit` convention (named in the title line), render
+with `render_band_table`:
 
 - `cargo run --example h2demo` — run in place.
 - `cargo install --path . --example h2demo` — install the
   demo as a `h2demo` binary.
+
+## Band report modules
+
+The band-table capability lives in the crate, split along the
+device/service line: `no_std` modules build report
+*structures* (what a device would ship over a wire), and the
+`std`-gated modules render them as text.
+
+- `bands` (`no_std`) — the z/p/n boundary [`Ladder`] generated
+  from two tail depths; fences are exact integer rationals.
+  Band assignment via the `BandAssign` trait with two
+  conventions (this crate's coinages, so reports name the one
+  in use):
+  - `RankSplit` — a bucket's rank span splits exactly across
+    the fences it crosses; band counts are exact.
+  - `MidRank` — whole bucket to its Hazen mid-rank band,
+    right-closed (iiac-perf's convention); value edges stay
+    disjoint, counts approximate.
+- `stats` (`no_std`) — midpoint-weighted count/mean/variance
+  over a rank window; two-pass variance (no cancellation);
+  `stdev()` under `std` (`core` has no `sqrt`).
+- `table` (`no_std`) — `BandTable`: bands + overall + trimmed
+  stats in one fixed-capacity structure, sized at compile time
+  from a `const Ladder`.
+- `report`, `numfmt` (`std`) — `render_band_table` with
+  measured or fixed column widths, boundary labels
+  (zpn / fraction / both), comma-grouped number formatting.
 
 ## no_std check
 
@@ -120,9 +152,10 @@ decisions are in [chores-01](notes/chores/chores-01.md).
   slice, keeping a future buffer-swap servicing model open
   (a background task exchanging a fresh buffer for a full
   one) without API changes.
-- **`no_std` core, `std` convenience** — analysis (quantiles,
-  merge, iteration) stays `no_std`-capable but off the hot
-  path; anything needing std is feature-gated.
+- **`no_std` core, `std` rendering** — analysis (quantiles,
+  merge, iteration) and the report structures stay
+  `no_std`-capable but off the hot path; turning structures
+  into text (`report`, `numfmt`) is `std`-gated.
 
 ## Initial design
 

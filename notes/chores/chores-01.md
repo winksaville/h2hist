@@ -534,7 +534,7 @@ instead; the walk is off the hot path.
   - `Both` in two-cell form prints zpn and fraction as
     separate columns (the demo's `{:<4} {:<13}` shape);
     min/max rows leave the fraction cell empty.
-- [[N]] 0.1.3-7 refactor: h2demo on library report path — the
+- [[20]] 0.1.3-7 refactor: h2demo on library report path — the
   cycle's integration proof: the demo drops from 288 to 78
   lines and every table number comes from the library modules.
   - Gate result: 23 of 24 output lines byte-identical, all
@@ -562,6 +562,19 @@ instead; the walk is off the hot path.
     (0.75.x, the in-refactor branch) — the `.vc-config.toml`
     schema migrated at `-6` is ahead of stable 0.71, so dev
     is the binary that accepts this repo.
+- [[N]] 0.1.3-8 docs: band report modules — the docs pass:
+  - README gains a "Band report modules" section (module map,
+    the two conventions and their tradeoff, the device/service
+    split); status and demo sections synced; the goals bullet
+    reads "`no_std` core, `std` rendering".
+  - ARCHITECTURE's Readout requirements gains the as-built
+    module summary; lib.rs's crate doc states the split.
+  - Demo ladder deepened to z4/n10, matching iiac-perf's
+    documented depths. Contrary to the plan's "visible
+    change" expectation, output is unchanged: at 1M samples
+    the n7..n10 bands hold no ranks and empty bands are
+    skipped — the deeper ladder is capacity for longer runs,
+    not new rows.
 
 # References
 
@@ -584,3 +597,4 @@ instead; the walk is off the hot path.
 [17]: https://github.com/winksaville/h2hist/commit/123a32ccdd26 "123a32ccdd265d2954ab0f28baebaec9b2ff81c2"
 [18]: https://github.com/winksaville/h2hist/commit/20c59cdd5db8 "20c59cdd5db8f35f36e782deb0340346a37f4b5f"
 [19]: https://github.com/winksaville/h2hist/commit/5a08fb046101 "5a08fb04610119474d7f9a47ee9e3739f4b8e03c"
+[20]: https://github.com/winksaville/h2hist/commit/c338302cdb88 "c338302cdb88cef1084af13fb6ada7784968b96b"

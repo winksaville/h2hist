@@ -84,7 +84,7 @@ decision — see [[5]].
     candidate
   - a drafted `no_std` renderer was rejected as machinery
     serving nobody (devices ship structs, services render)
-- [[N]] 0.1.3-7 refactor: h2demo on library report path (done)
+- [[13]] 0.1.3-7 refactor: h2demo on library report path (done)
   - demo 288 → 78 lines: record, spot quantiles, and header
     lines stay; the table is `BandTable` + `render_band_table`
     at the historical z4/n8 depths and fixed layout
@@ -94,9 +94,15 @@ decision — see [[5]].
   - `BandAssign` gains `name()` and the demo header names the
     convention ("(RankSplit)") — the two shipped names are this
     crate's coinages, so tables are self-describing
-- [[N]] 0.1.3-8 docs: band report modules
-  - README, ARCHITECTURE, and the switch to the fuller z4..n10
-    ladder as a visible change
+- [[N]] 0.1.3-8 docs: band report modules (done)
+  - README: status, demo description, new "Band report
+    modules" section, goals bullet → "`no_std` core, `std`
+    rendering"
+  - ARCHITECTURE: as-built module summary in Readout
+    requirements; lib.rs module doc synced
+  - demo ladder deepened to z4/n10 (iiac-perf's depths) —
+    output unchanged at 1M samples (the deeper bands hold no
+    ranks), so capacity, not a visible change
 - [[N]] 0.1.3 feat: no_std band report modules
   - close-out and validation
 
@@ -174,3 +180,4 @@ and older `## Done` sections are moved to [done.md](notes/done.md) to keep this 
 [10]: https://github.com/winksaville/h2hist/commit/123a32ccdd26 "123a32ccdd265d2954ab0f28baebaec9b2ff81c2"
 [11]: https://github.com/winksaville/h2hist/commit/20c59cdd5db8 "20c59cdd5db8f35f36e782deb0340346a37f4b5f"
 [12]: https://github.com/winksaville/h2hist/commit/5a08fb046101 "5a08fb04610119474d7f9a47ee9e3739f4b8e03c"
+[13]: https://github.com/winksaville/h2hist/commit/c338302cdb88 "c338302cdb88cef1084af13fb6ada7784968b96b"

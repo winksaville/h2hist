@@ -3,9 +3,9 @@
 //!
 //! - Builds the shared dev config's histogram, records
 //!   [`SAMPLES`] deterministic synthetic ticks, assembles a
-//!   [`BandTable`] over the z4/n8 ladder with the exact
-//!   rank-split convention, and renders it in the demo's
-//!   historical fixed layout.
+//!   [`BandTable`] over the z4/n10 ladder (iiac-perf's
+//!   documented depths) with the exact rank-split convention,
+//!   and renders it in the demo's historical fixed layout.
 //! - Everything the table shows comes from the library
 //!   modules; only the header lines and the p50/p99 spot
 //!   reads live here.
@@ -24,8 +24,8 @@ use dev::stream::HeavyTailed;
 /// Samples the demo records.
 const SAMPLES: usize = 1_000_000;
 
-/// The demo's historical ladder depths (z4..n8).
-const LADDER: Ladder = match Ladder::new(4, 8) {
+/// iiac-perf's documented ladder depths (z4..n10).
+const LADDER: Ladder = match Ladder::new(4, 10) {
     Ok(ladder) => ladder,
     Err(_) => panic!("invalid demo ladder"),
 };

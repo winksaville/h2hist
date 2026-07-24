@@ -4,10 +4,12 @@
 //!   relative error ≤ 2⁻ᵍ, max value 2ⁿ−1, O(1) integer-only
 //!   record path (clz + shift + saturating increment).
 //! - The core borrows caller-supplied counts storage; analysis
-//!   (quantiles, merge, iteration) stays off the hot path.
-//! - `std` feature (default) is convenience-only; the core is
-//!   `no_std`. See `ARCHITECTURE.md` for design and size
-//!   tradeoffs.
+//!   (quantiles, merge, iteration) and the band report
+//!   structures stay off the hot path and `no_std`.
+//! - `std` feature (default) adds the render modules
+//!   (`report`, `numfmt`) — the device/service split: devices
+//!   ship structures, services render text. See
+//!   `ARCHITECTURE.md` for design and size tradeoffs.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
